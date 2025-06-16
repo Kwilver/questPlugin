@@ -1,0 +1,21 @@
+name: questPlugin
+version: '1.0'
+main: me.kwilver.questPlugin.QuestPlugin
+api-version: '1.21'
+permissions:
+  op:
+    default: op
+commands:
+  debugQuest:
+    permission: op
+  questInfo:
+
+  glyphdebug:
+    permission: op
+  SpawnOracle:
+    permission: op
+  EquipGlyph:
+    permission: op
+  UseGlyph:
+
+
