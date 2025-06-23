@@ -12,9 +12,9 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Random;
 
-public class Easy extends LootTable {
+public class Debug extends LootTable {
     Random random = new Random();
-    public Easy(Quest quest, QuestPlugin questPlugin) {
+    public Debug(Quest quest, QuestPlugin questPlugin) {
         super(quest, questPlugin);
     }
 
@@ -26,20 +26,20 @@ public class Easy extends LootTable {
         selections.add(() -> items.add(new ItemStack(Material.COBWEB,
                 16 + random.nextInt(17))));
         selections.add(() -> items.add(new ItemStack(Material.GOLDEN_APPLE,
-                8 + random.nextInt(9))));
-        selections.add(() -> items.add(new ItemStack(Material.EXPERIENCE_BOTTLE,
                 16 + random.nextInt(17))));
+        selections.add(() -> items.add(new ItemStack(Material.EXPERIENCE_BOTTLE,
+                32 + random.nextInt(33))));
         selections.add(() -> items.add(new ItemStack(Material.BREEZE_ROD,
-                1 + random.nextInt(2))));
+                8 + random.nextInt(5))));
         selections.add(() -> items.add(new ItemStack(Material.TOTEM_OF_UNDYING)));
         selections.add(() -> items.add(new ItemStack(Material.DIAMOND,
-                1 + random.nextInt(16))));
+                16 + random.nextInt(17))));
         selections.add(() -> items.add(new ItemStack(Material.IRON_BLOCK,
                 4 + random.nextInt(5))));
         selections.add(() -> items.add(new ItemStack(Material.GOLD_BLOCK,
                 4 + random.nextInt(5))));
         selections.add(() -> items.add(new ItemStack(Material.EMERALD,
-                8 + random.nextInt(9))));
+                16 + random.nextInt(17))));
         selections.add(() -> items.add(new ItemStack(Material.EMERALD_BLOCK,
                 4 + random.nextInt(5))));
         selections.add(() -> items.add(randomBook()));
@@ -50,6 +50,8 @@ public class Easy extends LootTable {
             item.setItemMeta(meta);
             items.add(item);
         });
+        selections.add(() -> items.add(new ItemStack(Material.NETHERITE_SCRAP,
+                2 + random.nextInt(2))));
 
         Collections.shuffle(selections);
 
@@ -62,12 +64,12 @@ public class Easy extends LootTable {
 
     @Override
     protected boolean rollGlyph() {
-        return random.nextInt(10) < 2;
+        return true;
     }
 
     @Override
     protected boolean rollReroll() {
-        return false;
+        return true;
     }
 
     private ItemStack randomBook() {
@@ -75,23 +77,25 @@ public class Easy extends LootTable {
         EnchantmentStorageMeta meta = (EnchantmentStorageMeta) item.getItemMeta();
 
         List<Runnable> actions = List.of(
-                () -> meta.addStoredEnchant(Enchantment.AQUA_AFFINITY, 1, true),
-                () -> meta.addStoredEnchant(Enchantment.DEPTH_STRIDER, 1, true),
-                () -> meta.addStoredEnchant(Enchantment.EFFICIENCY, 1, true),
-                () -> meta.addStoredEnchant(Enchantment.FEATHER_FALLING, 1, true),
-                () -> meta.addStoredEnchant(Enchantment.FORTUNE, 1, true),
-                () -> meta.addStoredEnchant(Enchantment.LOOTING, 1, true),
-                () -> meta.addStoredEnchant(Enchantment.POWER, 1, true),
-                () -> meta.addStoredEnchant(Enchantment.PROTECTION, 1, true),
-                () -> meta.addStoredEnchant(Enchantment.RESPIRATION, 1, true),
-                () -> meta.addStoredEnchant(Enchantment.SHARPNESS, 1, true),
-                () -> meta.addStoredEnchant(Enchantment.SWEEPING_EDGE, 1, true),
-                () -> meta.addStoredEnchant(Enchantment.UNBREAKING, 1, true)
+                () -> meta.addStoredEnchant(Enchantment.AQUA_AFFINITY, 3, true),
+                () -> meta.addStoredEnchant(Enchantment.DEPTH_STRIDER, 3, true),
+                () -> meta.addStoredEnchant(Enchantment.EFFICIENCY, 3, true),
+                () -> meta.addStoredEnchant(Enchantment.FEATHER_FALLING, 3, true),
+                () -> meta.addStoredEnchant(Enchantment.FORTUNE, 3, true),
+                () -> meta.addStoredEnchant(Enchantment.LOOTING, 3, true),
+                () -> meta.addStoredEnchant(Enchantment.POWER, 3, true),
+                () -> meta.addStoredEnchant(Enchantment.PROTECTION, 3, true),
+                () -> meta.addStoredEnchant(Enchantment.RESPIRATION, 3, true),
+                () -> meta.addStoredEnchant(Enchantment.SHARPNESS, 3, true),
+                () -> meta.addStoredEnchant(Enchantment.SWEEPING_EDGE, 3, true),
+                () -> meta.addStoredEnchant(Enchantment.UNBREAKING, 3, true)
         );
 
+        Random random = new Random();
         actions.get(random.nextInt(actions.size())).run();
 
         item.setItemMeta(meta);
         return item;
     }
+
 }

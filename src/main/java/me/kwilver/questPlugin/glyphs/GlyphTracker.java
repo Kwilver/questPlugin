@@ -1,4 +1,5 @@
 package me.kwilver.questPlugin.glyphs;
+import net.md_5.bungee.api.ChatColor;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
@@ -30,10 +31,21 @@ public class GlyphTracker {
     }
 
     public boolean activate(Player user) {
-        user.sendMessage("used " + displayName);
-        if(cooldowns.containsKey(user.getUniqueId())) {
-            if(System.currentTimeMillis() - cooldowns.get(user.getUniqueId()) < cooldown) {
-                user.sendMessage("cooldown tim");
+        if (cooldowns.containsKey(user.getUniqueId())) {
+            long timeLeft = cooldown - (System.currentTimeMillis() - cooldowns.get(user.getUniqueId()));
+            if (timeLeft > 0) {
+                long seconds = timeLeft / 1000 % 60;
+                long minutes = timeLeft / (1000 * 60) % 60;
+                long hours = timeLeft / (1000 * 60 * 60) % 24;
+                long days = timeLeft / (1000 * 60 * 60 * 24);
+
+                StringBuilder timeString = new StringBuilder();
+                if (days > 0) timeString.append(days).append("d ");
+                if (hours > 0) timeString.append(hours).append("h ");
+                if (minutes > 0) timeString.append(minutes).append("m ");
+                if (seconds > 0) timeString.append(seconds).append("s");
+
+                user.sendMessage("Glyph is on cooldown for " + timeString.toString().trim());
                 return false;
             }
         }
@@ -43,7 +55,10 @@ public class GlyphTracker {
 
             boolean returnValue = glyphInit.useGlyph();
 
-            if(returnValue) cooldowns.put(user.getUniqueId(), System.currentTimeMillis());
+            if(returnValue) {
+                cooldowns.put(user.getUniqueId(), System.currentTimeMillis());
+                user.sendMessage(ChatColor.GREEN + "Used " + displayName);
+            }
 
             return returnValue;
         } catch (InvocationTargetException | InstantiationException | IllegalAccessException | NoSuchMethodException e) {

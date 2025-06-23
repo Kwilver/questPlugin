@@ -1,6 +1,7 @@
 package me.kwilver.questPlugin.glyphs;
 
 import me.kwilver.questPlugin.QuestPlugin;
+import net.md_5.bungee.api.ChatColor;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Material;
@@ -38,7 +39,6 @@ public class Geo extends Glyph {
             Vector current = start.toVector().add(direction.clone().multiply(i));
             Location loc = current.toLocation(start.getWorld());
 
-            // Optionally round to block centers
             loc.setX(loc.getBlockX() + 0.5);
             loc.setY(loc.getBlockY() + 0.5);
             loc.setZ(loc.getBlockZ() + 0.5);
@@ -131,6 +131,10 @@ public class Geo extends Glyph {
     }
 
     protected boolean useGlyph() {
+        if(user.getLocation().distance(QuestPlugin.getOracle().oracle.getLocation()) < 100) {
+            user.sendMessage(ChatColor.RED + "You cannot use Geo within 100 blocks of the Oracle!");
+            return false;
+        }
         user.getLineOfSight(null, 20);
         for(Block block : user.getLineOfSight(null, 20)) {
             endLoc = block.getLocation();

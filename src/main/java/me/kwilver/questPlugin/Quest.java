@@ -1,5 +1,8 @@
 package me.kwilver.questPlugin;
 
+import me.kwilver.questPlugin.lootTables.Easy;
+import me.kwilver.questPlugin.lootTables.LootTable;
+import me.kwilver.questPlugin.lootTables.Medium;
 import net.md_5.bungee.api.ChatColor;
 import org.bukkit.Bukkit;
 import org.bukkit.OfflinePlayer;
@@ -9,26 +12,39 @@ import org.bukkit.event.Listener;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.scheduler.BukkitRunnable;
 
+import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.UUID;
 
 import static me.kwilver.questPlugin.QuestPlugin.pluginMain;
 
 public abstract class Quest {
+    LootTable lootTable;
     Plugin plugin = pluginMain();
     protected QuestPlugin main;
-    protected OfflinePlayer player;
+    public OfflinePlayer player;
+    public long questEndTime;
 
-    public Quest(int questLength, Player player, QuestPlugin main) {
+    public Quest(int questLength, Player player, QuestPlugin main, Class<? extends LootTable> difficulty) {
         this.main = main;
         this.player = player;
+        questEndTime = System.currentTimeMillis() + questLength * 1000L;
+        try {
+            this.lootTable = difficulty.getDeclaredConstructor(Quest.class, QuestPlugin.class).newInstance(this, main);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
 
         if (this instanceof Listener) {
             Bukkit.getPluginManager().registerEvents((Listener) this, main);
         }
     }
 
-    //time will be in ms!
-    public long questEndTime = System.currentTimeMillis() + 90 * 1000; // 1.5 minutes
+    public LootTable getLootTable() {
+        return lootTable;
+    }
 
     protected void tick(Player onlinePlayer) {
 

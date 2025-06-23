@@ -24,7 +24,11 @@ public class SpawnOracle implements CommandExecutor {
 
         Player sender = (Player) commandSender;
 
-        new Oracle(main, sender.getLocation());
+        if(main.oracle != null) {
+            main.oracle.oracle.remove();
+        }
+
+        main.oracle = new Oracle(main, sender.getLocation());
 
         sender.sendMessage("Spawned the oracle!");
 

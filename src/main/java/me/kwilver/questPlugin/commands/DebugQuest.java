@@ -1,7 +1,8 @@
 package me.kwilver.questPlugin.commands;
 
 import me.kwilver.questPlugin.QuestPlugin;
-import me.kwilver.questPlugin.quests.AdminQuest;
+import me.kwilver.questPlugin.quests.easy.Farmer;
+import me.kwilver.questPlugin.quests.medium.*;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
@@ -16,7 +17,7 @@ public class DebugQuest implements CommandExecutor {
 
     @Override
     public boolean onCommand(@NotNull CommandSender commandSender, @NotNull Command command, @NotNull String s, @NotNull String @NotNull [] strings) {
-        main.newQuest(AdminQuest.class, (Player) commandSender); //TODO this is terrible remove asap
+        main.newQuest(Archaeologist.class, (Player) commandSender); //TODO this is terrible remove asap
         return true;
     }
 }

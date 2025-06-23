@@ -18,4 +18,12 @@ commands:
     permission: op
   UseGlyph:
 
+  acceptChallenge:
+
+  declineChallenge:
+
+  remove:
+    permission: op
+
+
 

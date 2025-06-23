@@ -2,15 +2,23 @@ package me.kwilver.questPlugin;
 
 import me.kwilver.questPlugin.commands.*;
 import me.kwilver.questPlugin.glyphs.*;
+import me.kwilver.questPlugin.lootTables.LootTable;
 import net.kyori.adventure.text.Component;
 import net.md_5.bungee.api.ChatColor;
 import net.md_5.bungee.api.ChatMessageType;
 import net.md_5.bungee.api.chat.TextComponent;
 import org.bukkit.*;
 import org.bukkit.attribute.Attribute;
+import org.bukkit.configuration.file.FileConfiguration;
+import org.bukkit.configuration.file.YamlConfiguration;
+import org.bukkit.enchantments.Enchantment;
+import org.bukkit.entity.Item;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
+import org.bukkit.event.entity.EntityDamageByEntityEvent;
+import org.bukkit.event.entity.EntityDamageEvent;
+import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.inventory.Inventory;
@@ -22,6 +30,8 @@ import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 import org.bukkit.scheduler.BukkitRunnable;
 
+import java.io.File;
+import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.util.*;
@@ -42,14 +52,20 @@ public final class QuestPlugin extends JavaPlugin implements Listener {
     public Map<UUID, List<GlyphTracker>> equippedGlyphs = new HashMap<>();
     public Map<UUID, GlyphTracker> pendingGlyphs = new HashMap<>();
 
+    private File playerDataFile;
+    private FileConfiguration playerDataConfig;
+    public Map<UUID, Long> lastCompletions = new HashMap<>();
+
+    public static Oracle oracle;
+
     @Override
     public void onEnable() {
-        stringToGlyph.put("Aeolus", new GlyphTracker(Aeolus.class,
-                "Aeolus",
-                List.of("Release a burst of wind that knocks back enemies.",
-                        ChatColor.YELLOW + "Cooldown: 3m"),
-                5000,
-                3 * 60));
+        //stringToGlyph.put("Aeolus", new GlyphTracker(Aeolus.class,
+        //        "Aeolus",
+        //        List.of("Release a burst of wind that knocks back enemies.",
+        //                ChatColor.YELLOW + "Cooldown: 3m"),
+        //        5000,
+        //        3 * 60));
         stringToGlyph.put("Dash", new GlyphTracker(Dash.class,
                 "Dash",
                 List.of("Gain a burst of energy allowing you to soar through the air.",
@@ -62,12 +78,12 @@ public final class QuestPlugin extends JavaPlugin implements Listener {
                         ChatColor.YELLOW + "Cooldown: 2m"),
                 5002,
                 2 * 60));
-        stringToGlyph.put("Flashback", new GlyphTracker(Flashback.class,
-                "Flashback",
-                List.of("Harness the power of time itself to \"flashback\" to a previous location.",
-                        ChatColor.YELLOW + "Cooldown: 10m"),
-                5003,
-                2 * 60));
+        //stringToGlyph.put("Flashback", new GlyphTracker(Flashback.class,
+        //        "Flashback",
+        //        List.of("Harness the power of time itself to \"flashback\" to a previous location.",
+        //                ChatColor.YELLOW + "Cooldown: 10m"),
+        //        5003,
+        //        2 * 60));
         stringToGlyph.put("Geo", new GlyphTracker(Geo.class,
                 "Geo",
                 List.of("Summon a meteor from the heavens to rain terror upon the ground below.",
@@ -124,6 +140,7 @@ public final class QuestPlugin extends JavaPlugin implements Listener {
         getCommand("SpawnOracle").setExecutor(new SpawnOracle(this));
         getCommand("EquipGlyph").setExecutor(new EquipGlyph(this));
         getCommand("UseGlyph").setExecutor(new Ability(this));
+        getCommand("Remove").setExecutor(new Remove(this));
 
         Bukkit.getPluginManager().registerEvents(this, this);
 
@@ -170,6 +187,27 @@ public final class QuestPlugin extends JavaPlugin implements Listener {
                 }
             }
         }.runTaskTimer(this, 0, 5 * 20);
+
+        playerDataFile = new File(getDataFolder(), "playerdata.yml");
+        if (!playerDataFile.exists()) {
+            playerDataFile.getParentFile().mkdirs();
+            saveResource("playerdata.yml", false);
+        }
+
+        playerDataConfig = YamlConfiguration.loadConfiguration(playerDataFile);
+
+        for(String string : playerDataConfig.getKeys(false)) {
+            List<GlyphTracker> equipped = new ArrayList<>();
+            for(String string1 : playerDataConfig.getStringList(string)) {
+                equipped.add(stringToGlyph.get(string1));
+            }
+
+            equippedGlyphs.put(UUID.fromString(string), equipped);
+        }
+    }
+
+    public static Oracle getOracle() {
+        return oracle;
     }
 
     public void newQuest(Class<? extends Quest> questClass, Player player) {
@@ -198,6 +236,7 @@ public final class QuestPlugin extends JavaPlugin implements Listener {
     }
 
     public void endQuest(OfflinePlayer p, boolean success) {
+        LootTable questTable = activeQuests.get(p).getLootTable();
         activeQuests.get(p).cleanup();
         activeQuests.remove(p);
 
@@ -207,18 +246,33 @@ public final class QuestPlugin extends JavaPlugin implements Listener {
                 player.playSound(player.getLocation(), Sound.ENTITY_EVOKER_CAST_SPELL, 1, 1);
                 player.sendTitle(ChatColor.GREEN + "Quest Completed!", "The Oracle smiles upon your triumph.");
 
-                //TODO loot generation
+                questTable.questCompletion();
             } else {
                 player.playSound(player.getLocation(), Sound.BLOCK_ANVIL_FALL, 1, 1);
                 player.sendTitle(ChatColor.RED + "Quest Failed", "Even the Oracle cannot alter lost time.");
             }
         }
+
+        lastCompletions.put(p.getUniqueId(), System.currentTimeMillis());
     }
 
     @Override
     public void onDisable() {
-        // Plugin shutdown logic
+        for (UUID id : equippedGlyphs.keySet()) {
+            List<String> glyphStrings = new ArrayList<>();
+            for (GlyphTracker glyph : equippedGlyphs.get(id)) {
+                glyphStrings.add(glyphToString.get(glyph));
+            }
+            playerDataConfig.set(id.toString(), glyphStrings); // Set full list at once
+        }
+
+        try {
+            playerDataConfig.save(playerDataFile);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
+
 
     public static Plugin pluginMain() {
         return Bukkit.getPluginManager().getPlugin("questPlugin");
@@ -320,6 +374,109 @@ public final class QuestPlugin extends JavaPlugin implements Listener {
         }.runTaskTimer(this, 0, 1); // Run every tick
     }
 
+    public static final List<ItemStack> RARE_ITEMS = createRareItems();
+
+    private static List<ItemStack> createRareItems() {
+        List<ItemStack> items = new ArrayList<>();
+
+        items.add(new ItemStack(Material.NETHER_STAR));
+        items.add(new ItemStack(Material.ENCHANTED_GOLDEN_APPLE));
+        items.add(new ItemStack(Material.TOTEM_OF_UNDYING));
+        items.add(new ItemStack(Material.ELYTRA));
+        items.add(new ItemStack(Material.BEACON));
+        items.add(new ItemStack(Material.MUSIC_DISC_5));
+        items.add(new ItemStack(Material.MUSIC_DISC_PIGSTEP));
+        items.add(new ItemStack(Material.HEART_OF_THE_SEA));
+        items.add(new ItemStack(Material.NAUTILUS_SHELL));
+        items.add(new ItemStack(Material.TRIDENT));
+        items.add(new ItemStack(Material.ANCIENT_DEBRIS));
+        items.add(new ItemStack(Material.NETHERITE_INGOT));
+        items.add(new ItemStack(Material.END_CRYSTAL));
+        items.add(new ItemStack(Material.WITHER_ROSE));
+        items.add(new ItemStack(Material.SHULKER_SHELL));
+        items.add(new ItemStack(Material.GHAST_TEAR));
+        items.add(new ItemStack(Material.BLAZE_ROD));
+
+        // Fully enchanted diamond gear
+        items.add(makeEnchanted(Material.DIAMOND_HELMET));
+        items.add(makeEnchanted(Material.DIAMOND_CHESTPLATE));
+        items.add(makeEnchanted(Material.DIAMOND_LEGGINGS));
+        items.add(makeEnchanted(Material.DIAMOND_BOOTS));
+        items.add(makeEnchanted(Material.DIAMOND_SWORD));
+        items.add(makeEnchanted(Material.DIAMOND_PICKAXE));
+        items.add(makeEnchanted(Material.DIAMOND_AXE));
+        items.add(makeEnchanted(Material.SHIELD));
+
+        return items;
+    }
+
+    private static ItemStack makeEnchanted(Material material) {
+        ItemStack item = new ItemStack(material);
+        ItemMeta meta = item.getItemMeta();
+
+        if (meta != null) {
+            switch (material) {
+                case DIAMOND_HELMET, DIAMOND_CHESTPLATE, DIAMOND_LEGGINGS, DIAMOND_BOOTS -> {
+                    meta.addEnchant(Enchantment.PROTECTION, 4, true);
+                    meta.addEnchant(Enchantment.UNBREAKING, 3, true);
+                    meta.addEnchant(Enchantment.MENDING, 1, true);
+                    if (material == Material.DIAMOND_BOOTS) {
+                        meta.addEnchant(Enchantment.DEPTH_STRIDER, 3, true);
+                        meta.addEnchant(Enchantment.FEATHER_FALLING, 4, true);
+                    }
+                    if (material == Material.DIAMOND_HELMET) {
+                        meta.addEnchant(Enchantment.RESPIRATION, 3, true);
+                        meta.addEnchant(Enchantment.AQUA_AFFINITY, 1, true);
+                    }
+                }
+                case DIAMOND_SWORD -> {
+                    meta.addEnchant(Enchantment.SHARPNESS, 5, true);
+                    meta.addEnchant(Enchantment.LOOTING, 3, true);
+                    meta.addEnchant(Enchantment.UNBREAKING, 3, true);
+                    meta.addEnchant(Enchantment.MENDING, 1, true);
+                }
+                case DIAMOND_PICKAXE -> {
+                    meta.addEnchant(Enchantment.EFFICIENCY, 5, true);
+                    meta.addEnchant(Enchantment.FORTUNE, 3, true);
+                    meta.addEnchant(Enchantment.UNBREAKING, 3, true);
+                    meta.addEnchant(Enchantment.MENDING, 1, true);
+                }
+                case DIAMOND_AXE -> {
+                    meta.addEnchant(Enchantment.EFFICIENCY, 5, true);
+                    meta.addEnchant(Enchantment.SHARPNESS, 5, true);
+                    meta.addEnchant(Enchantment.UNBREAKING, 3, true);
+                    meta.addEnchant(Enchantment.MENDING, 1, true);
+                }
+                case SHIELD -> {
+                    meta.addEnchant(Enchantment.UNBREAKING, 3, true);
+                    meta.addEnchant(Enchantment.MENDING, 1, true);
+                }
+            }
+
+            item.setItemMeta(meta);
+        }
+
+        return item;
+    }
+
+    private static final Random random = new Random();
+
+    public static void dropRandomLoot(Location location) {
+        List<ItemStack> lootPool = createRareItems();
+        Collections.shuffle(lootPool);
+
+        int amount = 3 + random.nextInt(3); // 3–5 items
+
+        for (int i = 0; i < amount && i < lootPool.size(); i++) {
+            ItemStack stack = lootPool.get(i).clone();
+            Item dropped = location.getWorld().dropItemNaturally(location, stack);
+            dropped.setPickupDelay(10);
+        }
+
+        location.getWorld().playSound(location, Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 1.0f, 0.8f);
+        location.getWorld().spawnParticle(Particle.END_ROD, location.add(0, 1, 0), 30, 0.3, 0.5, 0.3, 0.01);
+    }
+
     @EventHandler
     public void onPlayerJoin(PlayerJoinEvent e) {
         double baseValue = e.getPlayer().getAttribute(Attribute.SCALE).getBaseValue();
@@ -327,6 +484,20 @@ public final class QuestPlugin extends JavaPlugin implements Listener {
             e.getPlayer().sendMessage("Changing from " + baseValue + " to 1.0");
             e.getPlayer().getAttribute(Attribute.SCALE).setBaseValue(1.0);
         }
+    }
+
+    @EventHandler
+    public void onPlayerDeath(PlayerDeathEvent e) {
+        UUID id = e.getPlayer().getUniqueId();
+        List<GlyphTracker> glyphs = equippedGlyphs.getOrDefault(id, new ArrayList<>());
+
+        if(glyphs.isEmpty()) return;
+
+        if(glyphs.size() == 1) glyphs.clear();
+
+        if(glyphs.size() == 2) glyphs.remove(random.nextInt(1));
+
+        equippedGlyphs.put(id, glyphs);
     }
 
     public static Plugin getInstance() {
@@ -384,6 +555,17 @@ public final class QuestPlugin extends JavaPlugin implements Listener {
         if (newGlyph == null) return;
 
         int slot = e.getRawSlot();
+
+        if (slot == 49) {
+            pendingGlyphs.remove(uuid);
+            player.sendMessage(ChatColor.GOLD + "You chose to take loot instead of equipping the glyph.");
+            dropRandomLoot(player.getLocation());
+
+            player.playSound(player.getLocation(), Sound.ENTITY_PLAYER_LEVELUP, 1, 1);
+            player.closeInventory();
+            return;
+        }
+
         int replaceIndex = -1;
 
         if (slot == 29) {
@@ -405,5 +587,12 @@ public final class QuestPlugin extends JavaPlugin implements Listener {
 
         player.sendMessage(ChatColor.YELLOW + "Replaced " + ChatColor.RED + oldGlyph.displayName + ChatColor.YELLOW + " with " + ChatColor.GREEN + newGlyph.displayName);
         player.closeInventory();
+    }
+
+    @EventHandler
+    public void onEntityDamage(EntityDamageEvent e) {
+        if(e.getEntity() == oracle.oracle) {
+            e.setCancelled(true);
+        }
     }
 }

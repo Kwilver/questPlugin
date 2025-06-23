@@ -1,6 +1,7 @@
 package me.kwilver.questPlugin.glyphs;
 
 import org.bukkit.Bukkit;
+import org.bukkit.Particle;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.HandlerList;
@@ -36,6 +37,7 @@ public class Dash extends Glyph implements Listener {
             int ticks = 0;
             @Override
             public void run() {
+                user.getWorld().spawnParticle(Particle.SOUL_FIRE_FLAME, user.getLocation(), 30, 0.3, 0.3, 0.3, 0.05);
                 if (user.isOnGround()) {
                     ticks++;
                     if (ticks > 10) {
@@ -45,7 +47,6 @@ public class Dash extends Glyph implements Listener {
                 } else {
                     ticks = 0;
                 }
-
             }
         }.runTaskTimer(plugin, 0, 1);
 
