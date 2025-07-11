@@ -18,7 +18,7 @@ public class TasteTester extends Quest implements Listener {
     Set<Material> count = new HashSet<>();
 
     public TasteTester(Player player, QuestPlugin main) {
-        super(3 * 60 * 60, player, main, Easy.class);
+        super(2 * 60 * 60, player, main, Easy.class);
 
     }
 

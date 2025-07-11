@@ -2,19 +2,25 @@ name: questPlugin
 version: '1.0'
 main: me.kwilver.questPlugin.QuestPlugin
 api-version: '1.21'
-permissions:
-  op:
-    default: op
+depend: [ProtocolLib]
 commands:
   debugQuest:
     permission: op
   questInfo:
 
-  glyphdebug:
-    permission: op
-  SpawnOracle:
+  #glyphdebug:
+  #  permission: op
+  SummonOracle:
     permission: op
   EquipGlyph:
+    permission: op
+  GlyphManager:
+    permission: op
+  enablequest:
+    permission: op
+  disablequest:
+    permission: op
+  GlyphLoadout:
     permission: op
   UseGlyph:
 

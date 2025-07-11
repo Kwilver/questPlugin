@@ -1,64 +1,76 @@
 package me.kwilver.questPlugin.glyphs;
 
-import me.kwilver.questPlugin.QuestPlugin;
-import org.bukkit.Bukkit;
-import org.bukkit.Location;
-import org.bukkit.Particle;
-import org.bukkit.World;
+import org.bukkit.*;
+import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.util.Vector;
+import org.bukkit.Particle.DustOptions;
+
+import java.util.HashSet;
+import java.util.Set;
+import java.util.UUID;
 
 public class Aeolus extends Glyph {
     public Aeolus(Player player) {
         super(player);
     }
 
-    public void drawParticleCircle(Location center, double radius) {
-        World world = center.getWorld();
-        double points = radius * 5;
-
-        for (int i = 0; i < points; i++) {
-            double angle = 2 * Math.PI * i / points;
-            double x = radius * Math.cos(angle);
-            double z = radius * Math.sin(angle);
-
-            Location particleLocation = center.clone().add(x, 0, z);
-            world.spawnParticle(Particle.WHITE_SMOKE, particleLocation, 1, 0, 0, 0, 0);
-        }
-    }
-
     @Override
     protected boolean useGlyph() {
-        Location userLoc = user.getLocation().clone();
+        Location origin = user.getLocation().clone();
+        origin.setY(user.getLocation().getY() + 1);
+        Set<UUID> hitPlayers = new HashSet<>();
+
         new BukkitRunnable() {
-            double radius = 0;
-            public void run () {
-                for(Player p : Bukkit.getOnlinePlayers()) {
-                    Location pLoc = p.getLocation();
+            double radius = 1.5;
+            final double maxRadius = 15.0;
 
-                    if(pLoc.getY() == userLoc.getY() || pLoc.getY() + 1 == userLoc.getY()) {
-                        if(pLoc.distance(userLoc) <= radius) {
-                            Location loc = pLoc.clone();
-                            loc.setY(user.getLocation().getY());
+            @Override
+            public void run() {
+                if (radius > maxRadius) {
+                    cancel();
+                    return;
+                }
 
-                            Vector pVec = loc.toVector();
-                            Vector uVec = user.getLocation().toVector();
+                int points = (int) (radius * 12);
+                for (int i = 0; i < points; i++) {
+                    double angle = 2 * Math.PI * i / points;
+                    double x = Math.cos(angle) * radius;
+                    double z = Math.sin(angle) * radius;
+                    Location loc = origin.clone().add(x, 0, z);
 
-                            Vector direction = pVec.subtract(uVec).normalize();
+                    DustOptions green = new DustOptions(Color.LIME, 1);
+                    DustOptions white = new DustOptions(Color.WHITE, 0.5f);
 
-                            p.setVelocity(p.getVelocity().add(direction.multiply(5).add(new Vector(0, 5, 0))));
+                    origin.getWorld().spawnParticle(Particle.DUST, loc, 1, 0, 0, 0, 0, green);
+                    if (i % 5 == 0) {
+                        origin.getWorld().spawnParticle(Particle.DUST, loc.clone().add(0, 0.2, 0), 1, 0, 0, 0, 0, white);
+                    }
+
+                    // Repel players
+                    for (Entity e : origin.getWorld().getNearbyEntities(loc, 0.5, 1, 0.5)) {
+                        if (e instanceof Player target
+                                && !target.getUniqueId().equals(user.getUniqueId())
+                                && !hitPlayers.contains(target.getUniqueId())) {
+
+                            // Launch target up and away
+                            Vector direction = target.getLocation().toVector().subtract(origin.toVector()).normalize();
+                            direction.setY(0.6); // upward force
+                            target.setVelocity(direction.multiply(1.5));
+
+                            // Deal 3 hearts = 6 HP true damage
+                            double newHp = target.getHealth() - 6.0;
+                            target.setHealth(Math.max(newHp, 0.0));
+
+                            hitPlayers.add(target.getUniqueId());
                         }
                     }
                 }
-
-                drawParticleCircle(userLoc, radius);
-
-                radius += 0.5;
-
-                if(radius >= 15) cancel();
+                radius += 1.5;
             }
-        }.runTaskTimer(QuestPlugin.getInstance(), 0, 1);
-        return false;
+        }.runTaskTimer(plugin, 0, 2);
+
+        return true;
     }
 }

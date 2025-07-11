@@ -36,8 +36,8 @@ public class GlyphDebug implements CommandExecutor, Listener {
         Inventory gui = Bukkit.createInventory(null, size, GUI_TITLE);
 
         int index = 0;
-        for(Map.Entry<String, GlyphTracker> entry : main.stringToGlyph.entrySet()) {
-            gui.setItem(index++, entry.getValue().getItem());
+        for(GlyphTracker t : main.allGlyphs) {
+            gui.setItem(index++, t.getItem());
         }
 
         selectedPlayer.openInventory(gui);
@@ -58,9 +58,9 @@ public class GlyphDebug implements CommandExecutor, Listener {
         ItemStack clickedItem = event.getCurrentItem();
         if (clickedItem == null || clickedItem.getType() == Material.AIR) return;
 
-        for(Map.Entry<String, GlyphTracker> entry : main.stringToGlyph.entrySet()) {
-            if(entry.getValue().customModelData == clickedItem.getItemMeta().getCustomModelData()) {
-                entry.getValue().activate(player);
+        for(GlyphTracker t : main.allGlyphs) {
+            if(t.customModelData == clickedItem.getItemMeta().getCustomModelData()) {
+                t.activate(player);
             }
         }
     }

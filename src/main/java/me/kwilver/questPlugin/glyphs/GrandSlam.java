@@ -76,11 +76,7 @@ public class GrandSlam extends Glyph implements Listener {
     @EventHandler
     public void onDamage(EntityDamageEvent e) {
         if(e.getEntity() == user) {
-            Player p = (Player) e.getEntity();
-
             e.setCancelled(slamming);
-
-            p.sendMessage(e.getCause().name());
         }
     }
 

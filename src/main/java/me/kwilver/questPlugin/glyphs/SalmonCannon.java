@@ -28,10 +28,11 @@ public class SalmonCannon extends Glyph implements Listener {
         double explosionRadius = 6.0;
         int baseDamage = 4;
 
-        world.spawnParticle(Particle.FALLING_WATER, l, 600, 1, 1, 1, 0.3);
+        world.spawnParticle(Particle.FALLING_WATER, l, 400, 1, 1, 1, 0.3);
+        world.playSound(salmon.getLocation(), Sound.ENTITY_GENERIC_EXPLODE, 1, 1);
 
         for (Entity entity : world.getNearbyEntities(l, explosionRadius, explosionRadius, explosionRadius)) {
-            if (entity instanceof LivingEntity) {
+            if (entity instanceof LivingEntity e) {
                 Location loc = entity.getLocation();
                 double distance = loc.distance(l);
                 if (distance > explosionRadius) continue;
@@ -43,7 +44,8 @@ public class SalmonCannon extends Glyph implements Listener {
 
                 double damage = Math.ceil(maxDamage - distance) * 8;
                 if (damage > 0) {
-                    ((LivingEntity) entity).damage(damage);
+                    e.damage(damage);
+                    e.setVelocity(e.getLocation().toVector().subtract(salmon.getLocation().toVector()).normalize().multiply(0.3));
                 }
             }
         }
@@ -71,18 +73,26 @@ public class SalmonCannon extends Glyph implements Listener {
         Random random = new Random();
         new BukkitRunnable() {
             int tick = 0;
+            boolean exploded = false;
+
             @Override
             public void run() {
-                if (salmon.isDead() || tick >= 5 * 20) {
+                if (exploded) return;
+                if(salmon.isDead()) return;
+
+                if (tick >= 5 * 20) {
+                    exploded = true;
                     explode(salmon.getLocation(), salmon);
                     cancel();
+                    return;
                 }
 
-                //explode on collision
-                for(Entity e : salmon.getNearbyEntities(0.1, 0.1, 0.1)) {
+                for(Entity e : salmon.getNearbyEntities(0.5, 0.5, 0.5)) {
                     if(e instanceof LivingEntity && (!e.equals(user))) {
+                        exploded = true;
                         explode(salmon.getLocation(), salmon);
                         cancel();
+                        return;
                     }
                 }
 
@@ -91,22 +101,20 @@ public class SalmonCannon extends Glyph implements Listener {
                             Particle.CAMPFIRE_COSY_SMOKE,
                             salmon.getLocation(),
                             3,
-                            0, 0, 0, // offsets
-                            0        // speed
+                            0, 0, 0, 0
                     );
-
                     salmon.getWorld().spawnParticle(
                             Particle.SMOKE,
                             salmon.getLocation(),
                             3,
-                            0, 0, 0, // offsets
-                            0        // speed
+                            0, 0, 0, 0
                     );
                 }
 
                 tick++;
             }
         }.runTaskTimer(plugin, 0, 1);
+
         return true;
     }
 }

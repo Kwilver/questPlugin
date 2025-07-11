@@ -32,7 +32,7 @@ public class Farmer extends Quest implements TickingQuest {
         choices.add(Material.SUGAR_CANE);
         choices.add(Material.SWEET_BERRIES);
         choices.add(Material.BAMBOO);
-        choices.add(Material.COCOA);
+        choices.add(Material.COCOA_BEANS);
 
         selection = choices.get(new Random().nextInt(choices.size()));
     }

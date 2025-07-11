@@ -57,6 +57,9 @@ public class Archaeologist extends Quest implements Listener {
 
                     if (holdingBrush && stillLookingAtTarget) {
                         count++;
+                        if(count >= 3) {
+                            main.endQuest(player, true);
+                        }
                     }
                 }
             }.runTaskLater(QuestPlugin.getInstance(), 4 * 20);

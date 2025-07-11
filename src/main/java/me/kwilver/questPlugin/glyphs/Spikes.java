@@ -1,12 +1,9 @@
 package me.kwilver.questPlugin.glyphs;
 
 import org.bukkit.*;
-import org.bukkit.block.Block;
 import org.bukkit.block.data.BlockData;
 import org.bukkit.entity.BlockDisplay;
-import org.bukkit.entity.Display;
 import org.bukkit.entity.Player;
-import org.bukkit.plugin.Plugin;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 import org.bukkit.scheduler.BukkitRunnable;
@@ -17,10 +14,10 @@ import org.joml.Vector3f;
 
 import java.util.*;
 
-public class Dripstone extends Glyph {
-    List<BlockDisplay> spawnedDripstones = new ArrayList<>();
+public class Spikes extends Glyph {
+    List<BlockDisplay> spawnedSpikes = new ArrayList<>();
 
-    public Dripstone(Player selectedPlayer) {
+    public Spikes(Player selectedPlayer) {
         super(selectedPlayer);
     }
 
@@ -63,7 +60,7 @@ public class Dripstone extends Glyph {
         return locations;
     }
 
-    public void moveDripstone(Location loc, int index, int maxIndex, Player target, Location finalLoc) {
+    public void moveSpike(Location loc, int index, int maxIndex, Player target, Location finalLoc) {
         World world = loc.getWorld();
         if (world == null) return;
 
@@ -73,12 +70,12 @@ public class Dripstone extends Glyph {
         boolean isFinal = (index >= maxIndex - 1);
 
 
-        BlockData dripstoneData = Bukkit.createBlockData(Material.POINTED_DRIPSTONE);
+        BlockData SpikeData = Bukkit.createBlockData(Material.POINTED_DRIPSTONE);
         BlockDisplay display = world.spawn(loc.clone(), BlockDisplay.class, e -> {
-            e.setBlock(dripstoneData);
+            e.setBlock(SpikeData);
         });
 
-        spawnedDripstones.add(display);
+        spawnedSpikes.add(display);
 
         float scaleY = 3.0f;
         Vector scale = new Vector(1, scaleY, 1);
@@ -158,7 +155,7 @@ public class Dripstone extends Glyph {
             @Override
             public void run () {
                 if(ticks >= 7 * 20) {
-                    retractDripstones();
+                    retractSpikes();
                     this.cancel();
                 }
 
@@ -169,10 +166,10 @@ public class Dripstone extends Glyph {
         }.runTaskTimer(plugin, 0, 1);
     }
 
-    void retractDripstones() {
+    void retractSpikes() {
         int steps = 10;
 
-        for (BlockDisplay display : spawnedDripstones) {
+        for (BlockDisplay display : spawnedSpikes) {
             Vector3f translation = display.getTransformation().getTranslation();
 
             Vector startPos = new Vector(
@@ -210,7 +207,7 @@ public class Dripstone extends Glyph {
             }.runTaskTimer(plugin, 0L, 1L);
         }
 
-        spawnedDripstones.clear(); // clean up
+        spawnedSpikes.clear(); // clean up
     }
 
 
@@ -226,7 +223,7 @@ public class Dripstone extends Glyph {
                     new BukkitRunnable() {
                         @Override
                         public void run () {
-                            moveDripstone(loc, path.indexOf(loc), path.size(), target, path.getLast());
+                            moveSpike(loc, path.indexOf(loc), path.size(), target, path.getLast());
                         }
                     }.runTaskLater(plugin, path.indexOf(loc));
                 }

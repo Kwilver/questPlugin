@@ -18,7 +18,6 @@ import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.util.Vector;
 
-import java.lang.reflect.Array;
 import java.util.*;
 
 public abstract class LootTable implements Listener {
@@ -41,7 +40,7 @@ public abstract class LootTable implements Listener {
     public void questCompletion() {
         if(player.isOnline()) {
             items = rollItems();
-            glyph = rollGlyph() ? randomGlyph(player) : null;
+            glyph = rollGlyph() ? randomGlyph(QuestPlugin.equippedGlyphs.get(player.getUniqueId())) : null;
             reroll = rollReroll();
 
             Bukkit.getLogger().info("The quest was completed. Roll: " + glyph + ", " + reroll);
@@ -152,15 +151,14 @@ public abstract class LootTable implements Listener {
 
     protected abstract boolean rollReroll();
 
-    protected GlyphTracker randomGlyph(Player player) {
-        Random random = new Random();
-        List<GlyphTracker> equippedGlyphs = main.equippedGlyphs.getOrDefault(player.getUniqueId(), new ArrayList<>());
-        GlyphTracker glyph = null;
-        while(glyph == null || equippedGlyphs.contains(glyph)) {
-            int index = random.nextInt(main.glyphs.size());
-            glyph = main.glyphs.get(index);
-        }
-        return glyph;
+    protected GlyphTracker randomGlyph(List<GlyphTracker> equippedGlyphs) {
+        List<GlyphTracker> candidates = QuestPlugin.enabledGlyphs.stream()
+                .filter(g -> !equippedGlyphs.contains(g))
+                .toList();
+
+        if (candidates.isEmpty()) return null;
+
+        return candidates.get(new Random().nextInt(candidates.size()));
     }
 
     public Vector getRandomDirection(double speed, double pitchDegrees) {

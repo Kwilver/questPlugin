@@ -1,6 +1,9 @@
 package me.kwilver.questPlugin.glyphs;
+import me.kwilver.questPlugin.QuestPlugin;
 import net.md_5.bungee.api.ChatColor;
+import org.bukkit.Location;
 import org.bukkit.Material;
+import org.bukkit.Sound;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
@@ -13,7 +16,7 @@ import java.util.UUID;
 
 public class GlyphTracker {
     //properties
-    final Class<? extends Glyph> glyph;
+    public final Class<? extends Glyph> glyph;
     public final String displayName;
     public final List<String> lore;
     public final int customModelData;
@@ -30,7 +33,7 @@ public class GlyphTracker {
         this.cooldown = (long) cooldown * 1000;
     }
 
-    public boolean activate(Player user) {
+    public void activate(Player user) {
         if (cooldowns.containsKey(user.getUniqueId())) {
             long timeLeft = cooldown - (System.currentTimeMillis() - cooldowns.get(user.getUniqueId()));
             if (timeLeft > 0) {
@@ -46,7 +49,20 @@ public class GlyphTracker {
                 if (seconds > 0) timeString.append(seconds).append("s");
 
                 user.sendMessage("Glyph is on cooldown for " + timeString.toString().trim());
-                return false;
+                return;
+            }
+        }
+
+        if (!QuestPlugin.enabledGlyphs.contains(this)) {
+            user.sendMessage(ChatColor.RED + "This Glyph has been disabled by an admin.");
+            return;
+        }
+
+        for(Location l : QuestPlugin.disables.keySet()) {
+            if(l.distance(user.getLocation()) <= 100 && QuestPlugin.disables.get(l) != user.getUniqueId()) {
+                user.playSound(user.getLocation(), Sound.BLOCK_ANVIL_USE, 1, 1);
+                user.sendMessage(ChatColor.RED + "A player's disabler is blocking this glyph!");
+                return;
             }
         }
 
@@ -60,7 +76,6 @@ public class GlyphTracker {
                 user.sendMessage(ChatColor.GREEN + "Used " + displayName);
             }
 
-            return returnValue;
         } catch (InvocationTargetException | InstantiationException | IllegalAccessException | NoSuchMethodException e) {
             throw new RuntimeException(e);
         }

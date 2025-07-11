@@ -3,7 +3,7 @@ package me.kwilver.questPlugin;
 import me.kwilver.questPlugin.commands.*;
 import me.kwilver.questPlugin.glyphs.*;
 import me.kwilver.questPlugin.lootTables.LootTable;
-import net.kyori.adventure.text.Component;
+import me.kwilver.questPlugin.quests.QuestManager;
 import net.md_5.bungee.api.ChatColor;
 import net.md_5.bungee.api.ChatMessageType;
 import net.md_5.bungee.api.chat.TextComponent;
@@ -12,15 +12,17 @@ import org.bukkit.attribute.Attribute;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.enchantments.Enchantment;
+import org.bukkit.entity.ArmorStand;
+import org.bukkit.entity.Entity;
 import org.bukkit.entity.Item;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
-import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
+import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
@@ -34,6 +36,7 @@ import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
+import java.time.LocalDate;
 import java.util.*;
 
 import org.bukkit.util.Vector;
@@ -45,130 +48,229 @@ public final class QuestPlugin extends JavaPlugin implements Listener {
     private static Plugin instance;
     static Map<UUID, List<Location>> flashbackLocations = new HashMap<>();
 
-    public Map<String, GlyphTracker> stringToGlyph = new HashMap<>();
-    public Map<GlyphTracker, String> glyphToString = new HashMap<>();
-    public List<GlyphTracker> glyphs = new ArrayList<>();
+    public static Map<Location, UUID> disables = new HashMap<>();
 
-    public Map<UUID, List<GlyphTracker>> equippedGlyphs = new HashMap<>();
+    public static final List<GlyphTracker> allGlyphs = new ArrayList<>();
+    public static List<GlyphTracker> enabledGlyphs = new ArrayList<>();
+
+    public static Map<UUID, List<GlyphTracker>> equippedGlyphs = new HashMap<>();
     public Map<UUID, GlyphTracker> pendingGlyphs = new HashMap<>();
+
+    private File enabledGlyphFile;
+    private FileConfiguration enabledGlyphConfig;
 
     private File playerDataFile;
     private FileConfiguration playerDataConfig;
+
+    private File dailyFile;
+    private static YamlConfiguration dailyConfig;
+
+    private File idFile;
+    private FileConfiguration idConfig;
+
     public Map<UUID, Long> lastCompletions = new HashMap<>();
 
     public static Oracle oracle;
+    public static UUID oracleId;
+
+    public static QuestManager questManager;
+
+    public static Map<UUID, UUID> hiddenPlayers = new HashMap<>();
 
     @Override
     public void onEnable() {
-        //stringToGlyph.put("Aeolus", new GlyphTracker(Aeolus.class,
-        //        "Aeolus",
-        //        List.of("Release a burst of wind that knocks back enemies.",
-        //                ChatColor.YELLOW + "Cooldown: 3m"),
-        //        5000,
-        //        3 * 60));
-        stringToGlyph.put("Dash", new GlyphTracker(Dash.class,
+        instance = this;
+        questManager = new QuestManager();
+
+        allGlyphs.add(new GlyphTracker(Aeolus.class,
+                "Aeolus",
+                List.of("Release a burst of wind that knocks back enemies.",
+                        ChatColor.YELLOW + "Cooldown: 3m"),
+                5000,
+                3 * 60));
+        allGlyphs.add(new GlyphTracker(Dash.class,
                 "Dash",
                 List.of("Gain a burst of energy allowing you to soar through the air.",
                         ChatColor.YELLOW + "Cooldown: 15s"),
                 5001,
                 15));
-        stringToGlyph.put("Dripstone", new GlyphTracker(Dripstone.class,
+        allGlyphs.add(new GlyphTracker(Spikes.class,
                 "Dripstone",
                 List.of("Call upon sharp pillars from below the ground to stun your opponents.",
                         ChatColor.YELLOW + "Cooldown: 2m"),
                 5002,
                 2 * 60));
-        //stringToGlyph.put("Flashback", new GlyphTracker(Flashback.class,
-        //        "Flashback",
-        //        List.of("Harness the power of time itself to \"flashback\" to a previous location.",
-        //                ChatColor.YELLOW + "Cooldown: 10m"),
-        //        5003,
-        //        2 * 60));
-        stringToGlyph.put("Geo", new GlyphTracker(Geo.class,
+        allGlyphs.add(new GlyphTracker(Flashback.class,
+                "Flashback",
+                List.of("Harness the power of time itself to \"flashback\" to a previous location.",
+                        ChatColor.YELLOW + "Cooldown: 10m"),
+                5003,
+                2 * 60));
+        allGlyphs.add(new GlyphTracker(Geo.class,
                 "Geo",
                 List.of("Summon a meteor from the heavens to rain terror upon the ground below.",
                         ChatColor.YELLOW + "Cooldown: 3m"),
                 5004,
                 3 * 60));
-        stringToGlyph.put("GrandSlam", new GlyphTracker(GrandSlam.class,
+        allGlyphs.add(new GlyphTracker(GrandSlam.class,
                 "Grand Slam",
                 List.of("Leap up and slam down, blasting enemies with a shockwave.",
                         ChatColor.YELLOW + "Cooldown: 3m 30s"),
                 5005,
                 3 * 60 + 30));
-        stringToGlyph.put("Guardian", new GlyphTracker(Guardian.class,
+        allGlyphs.add(new GlyphTracker(Guardian.class,
                 "Guardian",
                 List.of("Summon a shield of ash that absorbs any and all enemy fire.",
                         ChatColor.YELLOW + "Cooldown: 3m 30s"),
                 5006,
                 3 * 60 + 30));
-        stringToGlyph.put("Mirror", new GlyphTracker(Mirror.class,
+        allGlyphs.add(new GlyphTracker(Mirror.class,
                 "Mirror",
                 List.of("Reflect any and all enemy fire.",
                         ChatColor.YELLOW + "Cooldown: 4m"),
                 5007,
                 4 * 60));
-        stringToGlyph.put("SalmonCannon", new GlyphTracker(SalmonCannon.class,
+        allGlyphs.add(new GlyphTracker(SalmonCannon.class,
                 "Salmon Cannon",
                 List.of("Release a trojan-salmon with deadly firepower.",
                         ChatColor.YELLOW + "Cooldown: 3m 30s"),
                 5008,
                 3 * 60 + 30));
-        stringToGlyph.put("SizeSync", new GlyphTracker(SizeSync.class,
+        allGlyphs.add(new GlyphTracker(SizeSync.class,
                 "Size Sync",
                 List.of("Shrink (or grow, when crouched) to an... unfamiliar size... this is opposite i gotta fix it",
                         ChatColor.YELLOW + "Cooldown: 2m"),
                 5009,
                 2 * 60));
-        stringToGlyph.put("Vampiric", new GlyphTracker(Vampiric.class,
+        allGlyphs.add(new GlyphTracker(Vampiric.class,
                 "Vampiric",
                 List.of("Instead of simply inflicting damage upon your adversary, take the health for yourself...",
                         ChatColor.YELLOW + "Cooldown: 3m"),
                 50010,
                 3 * 60));
+        allGlyphs.add(new GlyphTracker(Phantom.class,
+                "Phantom",
+                List.of("Summon an exact replica of yourself to copy your movements..",
+                        ChatColor.YELLOW + "Cooldown: 5m"),
+                50011,
+                5 * 60));
+        allGlyphs.add(new GlyphTracker(InfernoCleave.class,
+                "Inferno Cleave",
+                List.of("Summon a slash of fire...",
+                        ChatColor.YELLOW + "Cooldown: 4m"),
+                50012,
+                4 * 60));
+        allGlyphs.add(new GlyphTracker(Kraken.class,
+                "Kraken",
+                List.of("Pull players into a powerful \"whirlpool\"...",
+                        ChatColor.YELLOW + "Cooldown: 4m"),
+                50013,
+                4 * 60));
+        allGlyphs.add(new GlyphTracker(Tracker.class,
+                "Tracker",
+                List.of("Broadcast a player's position every 30 seconds after hitting them...",
+                        ChatColor.YELLOW + "Cooldown: 1h 30m"),
+                50014,
+                90 * 60));
+        allGlyphs.add(new GlyphTracker(Reaper.class,
+                "Reaper",
+                List.of("Cut your enemy's potion effects in half...",
+                        ChatColor.YELLOW + "Cooldown: 4m 30s"),
+                50015,
+                4 * 60 + 30));
+        allGlyphs.add(new GlyphTracker(Disabler.class,
+                "Disabler",
+                List.of("Disable all glyphs in a 100*100 area...",
+                        ChatColor.YELLOW + "Cooldown: 6m"),
+                50016,
+                6 * 60));
+        allGlyphs.add(new GlyphTracker(Conductor.class,
+                        "Conductor",
+                        List.of("Shock up to 5 of your enemies..."),
+                        50017,
+                        4 * 60));
+        allGlyphs.add(new GlyphTracker(Mimic.class,
+                "Mimic",
+                List.of("Morph into an entity of your choice..."),
+                50018,
+                3 * 60));
+        allGlyphs.add(new GlyphTracker(Curse.class,
+                "Curse",
+                List.of("Stun and curse a player of your choice..."),
+                50019,
+                        40));
 
-        for(String key : stringToGlyph.keySet()) {
-            glyphToString.put(stringToGlyph.get(key), key);
-            glyphs.add(stringToGlyph.get(key));
+
+        enabledGlyphFile = new File(getDataFolder(), "enabledGlyphs.yml");
+        if (!enabledGlyphFile.exists()) {
+            enabledGlyphFile.getParentFile().mkdirs();
+            saveResource("enabledGlyphs.yml", false);
         }
 
-        instance = this;
+        enabledGlyphConfig = YamlConfiguration.loadConfiguration(enabledGlyphFile);
+
+        if(!enabledGlyphConfig.contains("enabledGlyphs")) {
+            enabledGlyphs.addAll(allGlyphs);
+        } else {
+            for(GlyphTracker t : allGlyphs) {
+                if(enabledGlyphConfig.getStringList("enabledGlyphs").contains(t.glyph.getSimpleName())) {
+                    enabledGlyphs.add(t);
+                }
+            }
+        }
 
         getCommand("debugQuest").setExecutor(new DebugQuest(this));
         getCommand("questInfo").setExecutor(new QuestInfo(this));
-        getCommand("GlyphDebug").setExecutor(new GlyphDebug(this));
-        getCommand("SpawnOracle").setExecutor(new SpawnOracle(this));
-        getCommand("EquipGlyph").setExecutor(new EquipGlyph(this));
+        //getCommand("GlyphDebug").setExecutor(new GlyphDebug(this));
+        getCommand("SummonOracle").setExecutor(new SummonOracle(this));
+        //getCommand("EquipGlyph").setExecutor(new EquipGlyph(this));
         getCommand("UseGlyph").setExecutor(new Ability(this));
-        getCommand("Remove").setExecutor(new Remove(this));
+        getCommand("RemoveGlyph").setExecutor(new RemoveGlyph(this));
+        getCommand("glyphmanager").setExecutor(new GlyphManager());
+        getCommand("glyphLoadout").setExecutor(new GlyphLoadoutCommand());
+
+        QuestToggleCommand q = new QuestToggleCommand();
+        getCommand("enablequest").setExecutor(q);
+        getCommand("enablequest").setTabCompleter(q);
+        getCommand("disablequest").setExecutor(q);
+        getCommand("disablequest").setTabCompleter(q);
 
         Bukkit.getPluginManager().registerEvents(this, this);
 
         // quest ticker
         new BukkitRunnable() {
             @Override
-            public void run () {
-                for(OfflinePlayer p : activeQuests.keySet()) {
-                    Quest quest = activeQuests.get(p);
+            public void run() {
+                Iterator<Map.Entry<OfflinePlayer, Quest>> it = activeQuests.entrySet().iterator();
 
-                    Player player = p.getPlayer();
+                while (it.hasNext()) {
+                    Map.Entry<OfflinePlayer, Quest> entry = it.next();
+                    OfflinePlayer off = entry.getKey();
+                    Quest quest       = entry.getValue();
+                    Player player     = off.getPlayer();
 
-                    if(player != null) {
-                        if(quest instanceof TickingQuest) {
-                            quest.tick(player); //TODO quest ticking might not be necessary, consider removing after doing all of the quest templates
-                        }
-
-                        String output = "Quest: " + quest.displayName() + ChatColor.WHITE + " | " + ChatColor.AQUA + formatTimeRemaining(quest.msRemaining()) + ChatColor.WHITE +  " | /questinfo for requirements";
-
-                        player.spigot().sendMessage(ChatMessageType.ACTION_BAR, TextComponent.fromLegacyText(output));
+                    if (!quest.questActive()) {
+                        it.remove();
+                        endQuest(off, quest instanceof TimedQuest);
+                        continue;
                     }
 
-                    if(!quest.questActive()) {
-                        endQuest(p, false);
+                    if (player != null && player.isOnline()) {
+                        if (quest instanceof TickingQuest) {
+                            quest.tick(player);
+                        }
+                        String output = "Quest: " + quest.displayName()
+                                + ChatColor.WHITE + " | "
+                                + ChatColor.AQUA + formatTimeRemaining(quest.msRemaining());
+                        player.spigot().sendMessage(
+                                ChatMessageType.ACTION_BAR,
+                                TextComponent.fromLegacyText(output)
+                        );
                     }
                 }
             }
-        }.runTaskTimer(this, 0, 20);
+        }.runTaskTimer(this, 0L, 1L);
+
 
         new BukkitRunnable() {
             @Override
@@ -196,10 +298,36 @@ public final class QuestPlugin extends JavaPlugin implements Listener {
 
         playerDataConfig = YamlConfiguration.loadConfiguration(playerDataFile);
 
+        idFile = new File(getDataFolder(), "oracleId.yml");
+        if (!idFile.exists()) {
+            idFile.getParentFile().mkdirs();
+            saveResource("oracleId.yml", false);
+        }
+
+        dailyFile = new File(getDataFolder(), "dailyData.yml");
+        if (!dailyFile.exists()) {
+            saveResource("dailyData.yml", false);
+        }
+        dailyConfig = YamlConfiguration.loadConfiguration(dailyFile);
+
+        idConfig = YamlConfiguration.loadConfiguration(idFile);
+
+        String idString = idConfig.getString("id");
+        if(idString != null) {
+            UUID id = UUID.fromString(idString);
+
+            Entity entity = Bukkit.getEntity(id);
+
+            if (entity instanceof ArmorStand stand) {
+                Bukkit.getLogger().warning("Entity instanceof \"ARMOR_STAND\"");
+                oracle = new Oracle(this, stand.getLocation(), id);
+            }
+        }
+
         for(String string : playerDataConfig.getKeys(false)) {
             List<GlyphTracker> equipped = new ArrayList<>();
             for(String string1 : playerDataConfig.getStringList(string)) {
-                equipped.add(stringToGlyph.get(string1));
+                equipped.add(getGlyph(string1));
             }
 
             equippedGlyphs.put(UUID.fromString(string), equipped);
@@ -208,6 +336,10 @@ public final class QuestPlugin extends JavaPlugin implements Listener {
 
     public static Oracle getOracle() {
         return oracle;
+    }
+
+    public static void setOracle(Oracle oracle) {
+        QuestPlugin.oracle = oracle;
     }
 
     public void newQuest(Class<? extends Quest> questClass, Player player) {
@@ -249,19 +381,68 @@ public final class QuestPlugin extends JavaPlugin implements Listener {
                 questTable.questCompletion();
             } else {
                 player.playSound(player.getLocation(), Sound.BLOCK_ANVIL_FALL, 1, 1);
-                player.sendTitle(ChatColor.RED + "Quest Failed", "Even the Oracle cannot alter lost time.");
+                player.sendTitle(ChatColor.RED + "Quest Failed", "The Oracle awaits your return...");
             }
         }
 
+        recordCompletion(p.getUniqueId());
         lastCompletions.put(p.getUniqueId(), System.currentTimeMillis());
+    }
+
+    public void cancelQuest(OfflinePlayer p, String reason) {
+        activeQuests.get(p).cleanup();
+        activeQuests.remove(p);
+
+        if(p.isOnline()) {
+            Player player = p.getPlayer();
+            player.playSound(p.getLocation(), Sound.BLOCK_ANVIL_FALL, 1, 1);
+            player.sendTitle(ChatColor.RED + "Quest Cancelled", reason);
+            player.sendMessage("This does not count towards your daily completed quests or your quest cooldown!");
+        }
+    }
+
+    public static int getTodayCount(UUID playerUUID) {
+        String path = "players." + playerUUID;
+        String lastDate = dailyConfig.getString(path + ".lastDate", "");
+        int count = dailyConfig.getInt(path + ".count", 0);
+        if (!lastDate.equals(LocalDate.now().toString())) {
+            return 0;
+        }
+        return count;
+    }
+
+    public GlyphTracker getGlyph(String string) {
+        for(GlyphTracker t : allGlyphs) {
+            if(t.glyph.getSimpleName().equalsIgnoreCase(string)) {
+                return t;
+            }
+        }
+
+        Bukkit.getLogger().warning("Error in playerdata.yml--Remove anything you edited!");
+        return null;
+    }
+
+    public static void disabler(Location location, UUID id) {
+        disables.put(location, id);
+
+        new BukkitRunnable() {
+            @Override
+            public void run() {
+                disables.remove(location);
+            }
+        }.runTaskLater(getInstance(), 2 * 60 * 20);
     }
 
     @Override
     public void onDisable() {
+        questManager.onDisable();
+
+        saveDailyData();
+
         for (UUID id : equippedGlyphs.keySet()) {
             List<String> glyphStrings = new ArrayList<>();
             for (GlyphTracker glyph : equippedGlyphs.get(id)) {
-                glyphStrings.add(glyphToString.get(glyph));
+                glyphStrings.add(glyph.glyph.getSimpleName());
             }
             playerDataConfig.set(id.toString(), glyphStrings); // Set full list at once
         }
@@ -271,8 +452,59 @@ public final class QuestPlugin extends JavaPlugin implements Listener {
         } catch (IOException e) {
             e.printStackTrace();
         }
+
+        if (oracle != null && oracle.oracle != null && oracle.oracle.isValid()) {
+            idConfig.set("id", oracle.oracle.getUniqueId().toString());
+        } else {
+            idConfig.set("id", null);
+        }
+
+        try {
+            idConfig.save(idFile);
+        } catch (IOException e) {
+            getLogger().severe("Failed to save Oracle ID on disable. Respawn the Oracle when the server opens again!");
+        }
+
+        List<String> enabled = new ArrayList<>();
+        for(GlyphTracker glyph : enabledGlyphs) {
+            enabled.add(glyph.glyph.getSimpleName());
+        }
+        enabledGlyphConfig.set("enabledGlyphs", enabled);
+
+        try {
+            enabledGlyphConfig.save(enabledGlyphFile);
+        } catch (IOException e) {
+            getLogger().severe("Failed to save enabled glyphs--double check them when the server opens again!");
+        }
+
     }
 
+    private void saveDailyData() {
+        try {
+            dailyConfig.save(dailyFile);
+        } catch (IOException e) {
+            getLogger().severe("Could not save dailyData.yml");
+            e.printStackTrace();
+        }
+    }
+
+    public void recordCompletion(UUID playerUUID) {
+        String path = "players." + playerUUID;
+        String lastDateStr = dailyConfig.getString(path + ".lastDate", "");
+        int count = dailyConfig.getInt(path + ".count", 0);
+
+        LocalDate today = LocalDate.now(); // server’s local date
+        if (!lastDateStr.equals(today.toString())) {
+            count = 1;
+        } else {
+            count++;
+        }
+
+        // Save back
+        dailyConfig.set(path + ".lastDate", today.toString());
+        dailyConfig.set(path + ".count", count);
+        saveDailyData();
+    }
 
     public static Plugin pluginMain() {
         return Bukkit.getPluginManager().getPlugin("questPlugin");
@@ -488,7 +720,7 @@ public final class QuestPlugin extends JavaPlugin implements Listener {
 
     @EventHandler
     public void onPlayerDeath(PlayerDeathEvent e) {
-        UUID id = e.getPlayer().getUniqueId();
+        UUID id = e.getEntity().getUniqueId();
         List<GlyphTracker> glyphs = equippedGlyphs.getOrDefault(id, new ArrayList<>());
 
         if(glyphs.isEmpty()) return;
@@ -521,7 +753,7 @@ public final class QuestPlugin extends JavaPlugin implements Listener {
 
         pendingGlyphs.put(player.getUniqueId(), glyphTracker);
 
-        Inventory gui = Bukkit.createInventory(null, 54, Component.text(ChatColor.DARK_PURPLE + "Select a glyph to trade out or discard the new glyph and receive loot!"));
+        Inventory gui = Bukkit.createInventory(null, 54, ChatColor.DARK_PURPLE + "Select a glyph to trade out or discard the new glyph and receive loot!");
 
         ItemStack instructions = new ItemStack(Material.KNOWLEDGE_BOOK);
         ItemMeta instmeta = instructions.getItemMeta();
@@ -591,7 +823,7 @@ public final class QuestPlugin extends JavaPlugin implements Listener {
 
     @EventHandler
     public void onEntityDamage(EntityDamageEvent e) {
-        if(e.getEntity() == oracle.oracle) {
+        if(oracle != null && e.getEntity() == oracle.oracle) {
             e.setCancelled(true);
         }
     }

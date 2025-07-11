@@ -8,29 +8,27 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
 
-public class SpawnOracle implements CommandExecutor {
+public class SummonOracle implements CommandExecutor {
     QuestPlugin main;
 
-    public SpawnOracle(QuestPlugin main) {
+    public SummonOracle(QuestPlugin main) {
         this.main = main;
     }
 
     @Override
     public boolean onCommand(@NotNull CommandSender commandSender, @NotNull Command command, @NotNull String s, @NotNull String @NotNull [] strings) {
-        if(!(commandSender instanceof Player)) {
+        if(!(commandSender instanceof Player sender)) {
             commandSender.sendMessage("You must be a player to use this command.");
             return true;
         }
 
-        Player sender = (Player) commandSender;
-
-        if(main.oracle != null) {
-            main.oracle.oracle.remove();
+        if(QuestPlugin.getOracle() == null) {
+            QuestPlugin.setOracle(new Oracle(main, sender.getLocation(), null));
+        } else {
+             QuestPlugin.getOracle().oracle.teleport(sender.getLocation());
         }
 
-        main.oracle = new Oracle(main, sender.getLocation());
-
-        sender.sendMessage("Spawned the oracle!");
+        sender.sendMessage("Summoned the Oracle!");
 
         return true;
     }

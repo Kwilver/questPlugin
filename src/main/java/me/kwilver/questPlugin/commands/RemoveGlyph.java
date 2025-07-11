@@ -2,7 +2,6 @@ package me.kwilver.questPlugin.commands;
 
 import me.kwilver.questPlugin.QuestPlugin;
 import me.kwilver.questPlugin.glyphs.GlyphTracker;
-import me.kwilver.questPlugin.quests.medium.Archaeologist;
 import net.md_5.bungee.api.ChatColor;
 import org.bukkit.Bukkit;
 import org.bukkit.command.Command;
@@ -12,12 +11,11 @@ import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
-import java.util.Objects;
 import java.util.UUID;
 
-public class Remove implements CommandExecutor {
+public class RemoveGlyph implements CommandExecutor {
     QuestPlugin main;
-    public Remove(QuestPlugin main) {
+    public RemoveGlyph(QuestPlugin main) {
         this.main = main;
     }
 
@@ -36,27 +34,29 @@ public class Remove implements CommandExecutor {
             return true;
         }
 
-        if(Bukkit.getPlayer(args[1]) == null) {
+        Player p = Bukkit.getPlayer(args[1]);
+
+        if(p == null) {
             sender.sendMessage(ChatColor.RED + "Player \"" + args[1] + "\" doesn't exist!");
             return true;
         }
 
-        UUID uuid = Objects.requireNonNull(Bukkit.getPlayer(args[1])).getUniqueId();
+        UUID uuid = p.getUniqueId();
 
-        if(!main.equippedGlyphs.containsKey(uuid)) {
+        if(!QuestPlugin.equippedGlyphs.containsKey(uuid)) {
             sender.sendMessage(ChatColor.RED + "Player doesn't have any glyphs equipped!");
             return true;
         }
 
-        if(main.equippedGlyphs.get(uuid).get(num - 1) == null) {
+        if(QuestPlugin.equippedGlyphs.get(uuid).isEmpty() || QuestPlugin.equippedGlyphs.get(uuid).get(num - 1) == null) {
             sender.sendMessage(ChatColor.RED + "Player doesn't have a glyph equipped in that slot!");
             return true;
         }
 
-        List<GlyphTracker> list = main.equippedGlyphs.get(uuid);
+        List<GlyphTracker> list = QuestPlugin.equippedGlyphs.get(uuid);
         list.remove(num - 1);
 
-        main.equippedGlyphs.put(uuid, list);
+        QuestPlugin.equippedGlyphs.put(uuid, list);
         sender.sendMessage(ChatColor.GREEN + "Success!");
         return true;
     }

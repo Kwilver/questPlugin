@@ -26,9 +26,40 @@ public class Vampiric extends Glyph implements Listener {
     protected boolean useGlyph() {
         getServer().getPluginManager().registerEvents(this, plugin);
 
+        BukkitRunnable swirl = new BukkitRunnable() {
+            double angle = 0;
+            final double radius = 1.2;
+            final int particles = 12;
+            final Player p = user;
+
+            @Override
+            public void run() {
+                if (!p.isOnline()) {
+                    cancel();
+                    return;
+                }
+
+                Location loc = p.getLocation().add(0, 1.0, 0);
+
+                for (int i = 0; i < particles; i++) {
+                    double currentAngle = angle + (2 * Math.PI * i / particles);
+                    double x = Math.cos(currentAngle) * radius;
+                    double z = Math.sin(currentAngle) * radius;
+
+                    Location particleLoc = loc.clone().add(x, 0, z);
+                    particleLoc.getWorld().spawnParticle(Particle.ASH, particleLoc, 1, 0, 0, 0, 0.01);
+                }
+
+                angle += Math.PI / 16;
+            }
+        };
+
+        swirl.runTaskTimer(plugin, 0, 2);
+
         new BukkitRunnable() {
             public void run () {
                 HandlerList.unregisterAll(Vampiric.this);
+                swirl.cancel();
             }
         }.runTaskLater(plugin, 10 * 20);
 
@@ -37,44 +68,56 @@ public class Vampiric extends Glyph implements Listener {
 
     @EventHandler
     public void onEntityDamageByEntity(EntityDamageByEntityEvent e) {
-        if(e.getDamager().equals(user) && e.getEntity() instanceof LivingEntity) {
+        if (e.getDamager().equals(user) && e.getEntity() instanceof LivingEntity) {
             user.heal(e.getDamage() / 2);
-
             user.getWorld().playSound(user.getLocation(), Sound.ENTITY_WARDEN_HEARTBEAT, 1, 1);
 
-            Location victimLocation = e.getEntity().getLocation().clone().add(0, ((LivingEntity) e.getEntity()).getEyeHeight(), 0);
-            Location attackerLocation = user.getLocation().clone().add(0, ((LivingEntity) user).getEyeHeight(), 0);
+            Location victimLocation = ((LivingEntity) e.getEntity()).getEyeLocation();
+            Location attackerLocation = user.getEyeLocation();
 
-            Vector endVector = victimLocation.toVector();
-            Vector startVector = attackerLocation.toVector();
-            Vector vector = startVector.clone().subtract(endVector);
-
-            double distance = vector.length();
-
-            Vector unit = vector.normalize();
+            Vector direction = victimLocation.toVector().subtract(attackerLocation.toVector());
+            double distance = direction.length();
+            Vector unit = direction.normalize();
 
             new BukkitRunnable() {
                 double i = 0;
                 @Override
-                public void run () {
-                    if(i > distance) {
+                public void run() {
+                    if (i > distance) {
                         cancel();
+                        return;
                     }
 
                     Vector step = unit.clone().multiply(i);
-                    Location location = e.getEntity().getLocation().clone().add(step);
+                    Location loc = attackerLocation.clone().add(step);
 
-                    location.getWorld().spawnParticle(
-                            Particle.DAMAGE_INDICATOR,
-                            location,                // loc
-                            1,                    // count
-                            0.0, 0.0, 0.0,        // offset
-                            0.0                   // extra spe ed
-                    );
+                    loc.getWorld().spawnParticle(Particle.DAMAGE_INDICATOR, loc, 1, 0, 0, 0, 0);
+                    loc.getWorld().spawnParticle(Particle.SOUL, loc, 1, 0, 0, 0, 0.01);
+                    loc.getWorld().spawnParticle(Particle.DUST, loc, 1, 0, 0, 0, new Particle.DustOptions(org.bukkit.Color.fromRGB(120, 0, 0), 1.5F));
 
                     i += 0.5;
                 }
             }.runTaskTimer(plugin, 0, 1);
+
+            new BukkitRunnable() {
+                double t = 0;
+                @Override
+                public void run() {
+                    if (t > Math.PI * 2) {
+                        cancel();
+                        return;
+                    }
+
+                    double radius = 0.5;
+                    double x = radius * Math.cos(t);
+                    double z = radius * Math.sin(t);
+                    Location swirlLoc = user.getLocation().clone().add(x, 1, z);
+                    swirlLoc.getWorld().spawnParticle(Particle.CRIMSON_SPORE, swirlLoc, 1, 0, 0, 0, 0.01);
+
+                    t += Math.PI / 8;
+                }
+            }.runTaskTimer(plugin, 0, 1);
         }
     }
+
 }
