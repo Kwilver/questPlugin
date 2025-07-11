@@ -319,7 +319,7 @@ public final class QuestPlugin extends JavaPlugin implements Listener {
             Entity entity = Bukkit.getEntity(id);
 
             if (entity instanceof ArmorStand stand) {
-                Bukkit.getLogger().warning("Entity instanceof \"ARMOR_STAND\"");
+
                 oracle = new Oracle(this, stand.getLocation(), id);
             }
         }
