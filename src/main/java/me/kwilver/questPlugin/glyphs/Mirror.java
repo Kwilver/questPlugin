@@ -1,81 +1,81 @@
 package me.kwilver.questPlugin.glyphs;
 
 import org.bukkit.Bukkit;
+import org.bukkit.Color;
 import org.bukkit.Location;
 import org.bukkit.Particle;
-import org.bukkit.entity.Entity;
+import org.bukkit.Particle.DustOptions;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.HandlerList;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
-import org.bukkit.plugin.Plugin;
 import org.bukkit.scheduler.BukkitRunnable;
 
-import java.util.Random;
-
 public class Mirror extends Glyph implements Listener {
-    int hits = 0;
-    boolean active = true;
+    private int hits = 0;
+    private boolean active = true;
 
     public Mirror(Player player) {
         super(player);
     }
 
-
     @EventHandler
     public void onEntityDamageByEntity(EntityDamageByEntityEvent e) {
-        if(e.getEntity().equals(user) && hits <= 10 && active) {
-            if(e.getDamager() instanceof LivingEntity attacker) {
-                attacker.damage(e.getDamage() / 2);
+        if (!active) return;
+        if (e.getEntity().equals(user) && hits < 10) {
+            if (e.getDamager() instanceof LivingEntity attacker) {
+                attacker.damage(e.getDamage() * 0.5);
                 hits++;
             }
-        } else {
-            HandlerList.unregisterAll(Mirror.this);
+        } else if (e.getEntity().equals(user)) {
+            HandlerList.unregisterAll(this);
         }
     }
 
-    public void spawnSphere(Player player, double radius, int points) {
-        Location center = player.getLocation().add(0, 1, 0); // center of sphere
+    private void spawnCleanSphere(Player player, double radius, int points) {
+        Location center = player.getLocation().add(0, 1.2, 0);
+        double increment = Math.PI * (3 - Math.sqrt(5));  // golden angle
+        double offset = 2.0 / points;
 
-        for (double phi = 0; phi <= Math.PI; phi += Math.PI / points) {
-            for (double theta = 0; theta <= 2 * Math.PI; theta += Math.PI / points) {
-                double x = radius * Math.sin(phi) * Math.cos(theta);
-                double y = radius * Math.cos(phi);
-                double z = radius * Math.sin(phi) * Math.sin(theta);
+        for (int i = 0; i < points; i++) {
+            double y = i * offset - 1 + (offset / 2);
+            double r = Math.sqrt(1 - y * y);
+            double phi = i * increment;
+            double x = Math.cos(phi) * r;
+            double z = Math.sin(phi) * r;
 
-                Location particleLoc = center.clone().add(x, y, z);
-
-                Particle particle = new Random().nextInt(2) == 0 ? Particle.WHITE_SMOKE : Particle.WHITE_ASH;
-
-                player.getWorld().spawnParticle(particle, particleLoc, 1, 0, 0, 0, 0);
-            }
+            Location spawnLoc = center.clone().add(x * radius, y * radius, z * radius);
+            DustOptions dust = new DustOptions(Color.fromRGB(0, 200, 255), 0.6f);
+            player.getWorld().spawnParticle(Particle.DUST, spawnLoc, 1, 0, 0, 0, dust);
         }
     }
 
     @Override
     protected boolean useGlyph() {
-        plugin.getServer().getPluginManager().registerEvents(this, plugin);
+        Bukkit.getPluginManager().registerEvents(this, plugin);
 
-        BukkitRunnable particleRunnable = new BukkitRunnable() {
+        BukkitRunnable particleTask = new BukkitRunnable() {
             @Override
             public void run() {
-                spawnSphere(user, 2, 15);
+                if (!active) {
+                    this.cancel();
+                    return;
+                }
+                spawnCleanSphere(user, 2.0, 120);
             }
         };
-
-        particleRunnable.runTaskTimer(plugin, 0, 1);
+        particleTask.runTaskTimer(plugin, 0L, 2L);
 
         new BukkitRunnable() {
             @Override
             public void run() {
                 active = false;
-                particleRunnable.cancel();
+                HandlerList.unregisterAll(Mirror.this);
             }
-        }.runTaskLater(plugin, 25 * 20);
+        }.runTaskLater(plugin, 5 * 20L);
 
-        this.user = user;
         return true;
     }
 }

@@ -1,13 +1,11 @@
 package me.kwilver.questPlugin.glyphs;
 
 import org.bukkit.*;
-import org.bukkit.block.BlockType;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.HandlerList;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityDamageEvent;
-import org.bukkit.plugin.Plugin;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.util.Vector;
 
@@ -42,35 +40,65 @@ public class GrandSlam extends Glyph implements Listener {
 
             double dist = Math.sqrt(dx*dx + dy*dy + dz*dz);
             if (dist < RADIUS) {
-                target.damage(RADIUS - dist);
+                target.setHealth(target.getHealth() - (RADIUS - dist));
                 target.setVelocity(target.getVelocity().add(new Vector(0, .4, 0)));
             }
         }
     }
 
 
-    void spawnParticles() {
+    public void spawnParticles() {
         new BukkitRunnable() {
             double radius = 1;
+            final Particle.DustOptions[] rainbow = new Particle.DustOptions[] {
+                    new Particle.DustOptions(Color.RED, 1f),
+                    new Particle.DustOptions(Color.ORANGE, 1f),
+                    new Particle.DustOptions(Color.YELLOW, 1f),
+                    new Particle.DustOptions(Color.GREEN, 1f),
+                    new Particle.DustOptions(Color.BLUE, 1f),
+                    new Particle.DustOptions(Color.PURPLE, 1f)
+            };
+
             @Override
             public void run() {
-                radius+= 0.5;
-
-                if(radius >= 10) {
+                radius += 0.5;
+                if (radius >= 10) {
                     cancel();
                     return;
                 }
 
-                for(int i = 0; i < 100; i++) {
-                    double angle = 2 * Math.PI * i / 100;
-                    double x = radius * Math.cos(angle);
-                    double z = radius * Math.sin(angle);
-                    Location loc = user.getLocation().clone().add(x, 0 , z);
+                // Pulsing ring
+                boolean flash = ((int) radius) % 2 == 0;
+                Particle ringParticle = flash ? Particle.FIREWORK : Particle.SMOKE;
+                for (int deg = 0; deg < 360; deg += 10) {
+                    double rad = Math.toRadians(deg);
+                    double x = radius * Math.cos(rad);
+                    double z = radius * Math.sin(rad);
+                    double y = Math.sin(radius) + 1;
+                    Location loc = user.getLocation().clone().add(x, y, z);
 
-                    user.getWorld().spawnParticle(Particle.CRIT, loc, 1);
+                    user.getWorld().spawnParticle(ringParticle, loc, 1, 0, 0, 0, 0);
+                    user.getWorld().spawnParticle(Particle.CRIT, loc, 1, 0, 0, 0, 0);
+                }
+
+                // Center blast after halfway
+                if (radius > 5) {
+                    user.getWorld().spawnParticle(Particle.EXPLOSION, user.getLocation(), 1);
+                }
+
+                // Rainbow upward swirl
+                for (int i = 0; i < rainbow.length; i++) {
+                    double swirlRadius = radius * 0.2;
+                    double angle = radius * 2 + i * (2 * Math.PI / rainbow.length);
+                    double x = swirlRadius * Math.cos(angle);
+                    double z = swirlRadius * Math.sin(angle);
+                    double y = radius * 0.5; // rising effect
+                    Location loc = user.getLocation().clone().add(x, y, z);
+
+                    user.getWorld().spawnParticle(Particle.DUST, loc, 1, rainbow[i]);
                 }
             }
-        }.runTaskTimer(plugin, 0, 1);
+        }.runTaskTimer(plugin, 0L, 1L);
     }
 
     @EventHandler

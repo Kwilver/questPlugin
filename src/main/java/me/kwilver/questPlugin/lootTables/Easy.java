@@ -62,7 +62,7 @@ public class Easy extends LootTable {
 
     @Override
     protected boolean rollGlyph() {
-        return random.nextInt(10) < 2;
+        return random.nextInt(4) == 0;
     }
 
     @Override

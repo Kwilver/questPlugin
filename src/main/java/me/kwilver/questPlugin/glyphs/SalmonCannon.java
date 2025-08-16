@@ -42,9 +42,9 @@ public class SalmonCannon extends Glyph implements Listener {
                     maxDamage = (int) (maxDamage * 1.5);
                 }
 
-                double damage = Math.ceil(maxDamage - distance) * 8;
+                double damage = Math.ceil(maxDamage - distance);
                 if (damage > 0) {
-                    e.damage(damage);
+                    e.setHealth(e.getHealth() - damage);
                     e.setVelocity(e.getLocation().toVector().subtract(salmon.getLocation().toVector()).normalize().multiply(0.3));
                 }
             }

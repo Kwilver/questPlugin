@@ -18,8 +18,7 @@ public class Aeolus extends Glyph {
 
     @Override
     protected boolean useGlyph() {
-        Location origin = user.getLocation().clone();
-        origin.setY(user.getLocation().getY() + 1);
+        Location origin = user.getLocation().clone().add(0, 1, 0);
         Set<UUID> hitPlayers = new HashSet<>();
 
         new BukkitRunnable() {
@@ -40,36 +39,33 @@ public class Aeolus extends Glyph {
                     double z = Math.sin(angle) * radius;
                     Location loc = origin.clone().add(x, 0, z);
 
-                    DustOptions green = new DustOptions(Color.LIME, 1);
+                    DustOptions green = new DustOptions(Color.LIME, 1f);
                     DustOptions white = new DustOptions(Color.WHITE, 0.5f);
 
-                    origin.getWorld().spawnParticle(Particle.DUST, loc, 1, 0, 0, 0, 0, green);
+                    origin.getWorld().spawnParticle(Particle.DUST, loc, 1, green);
                     if (i % 5 == 0) {
-                        origin.getWorld().spawnParticle(Particle.DUST, loc.clone().add(0, 0.2, 0), 1, 0, 0, 0, 0, white);
+                        origin.getWorld().spawnParticle(Particle.DUST, loc.clone().add(0, 0.2, 0), 1, white);
                     }
 
-                    // Repel players
                     for (Entity e : origin.getWorld().getNearbyEntities(loc, 0.5, 1, 0.5)) {
                         if (e instanceof Player target
                                 && !target.getUniqueId().equals(user.getUniqueId())
                                 && !hitPlayers.contains(target.getUniqueId())) {
 
-                            // Launch target up and away
-                            Vector direction = target.getLocation().toVector().subtract(origin.toVector()).normalize();
-                            direction.setY(0.6); // upward force
-                            target.setVelocity(direction.multiply(1.5));
+                            Vector dir = target.getLocation().toVector().subtract(origin.toVector()).normalize();
+                            Vector horizontal = dir.clone().setY(0).normalize().multiply(2.5);
+                            Vector launchVel = horizontal.clone().setY(3.5);
+                            target.setVelocity(launchVel);
 
-                            // Deal 3 hearts = 6 HP true damage
                             double newHp = target.getHealth() - 6.0;
                             target.setHealth(Math.max(newHp, 0.0));
-
                             hitPlayers.add(target.getUniqueId());
                         }
                     }
                 }
                 radius += 1.5;
             }
-        }.runTaskTimer(plugin, 0, 2);
+        }.runTaskTimer(plugin, 0L, 2L);
 
         return true;
     }

@@ -20,7 +20,7 @@ public class Dash extends Glyph implements Listener {
 
     @EventHandler
     public void onEntityDamage(EntityDamageEvent e) {
-        if(e.getEntity().equals(user) && active && e.getCause().equals(EntityDamageEvent.DamageCause.FALL)) {
+        if (e.getEntity().equals(user) && active && e.getCause().equals(EntityDamageEvent.DamageCause.FALL)) {
             e.setCancelled(true);
         }
     }
@@ -28,29 +28,36 @@ public class Dash extends Glyph implements Listener {
     @Override
     protected boolean useGlyph() {
         Vector direction = user.getLocation().getDirection().normalize();
-        Vector velocity = direction.multiply(10);
-        velocity.setY(2);
-
+        Vector velocity = direction.multiply(6); // ~5-7 blocks forward
+        velocity.setY(0.75); // ~2 blocks up
         user.setVelocity(velocity);
 
+        Bukkit.getServer().getPluginManager().registerEvents(this, plugin);
+
         new BukkitRunnable() {
-            int ticks = 0;
+            private int groundTicks = 0;
+
             @Override
             public void run() {
-                user.getWorld().spawnParticle(Particle.SOUL_FIRE_FLAME, user.getLocation(), 30, 0.3, 0.3, 0.3, 0.05);
+                user.getWorld().spawnParticle(
+                        Particle.SOUL_FIRE_FLAME,
+                        user.getLocation(),
+                        8,
+                        0.2, 0.2, 0.2,
+                        0.03
+                );
                 if (user.isOnGround()) {
-                    ticks++;
-                    if (ticks > 10) {
+                    if (++groundTicks > 5) {
+                        active = false;
                         HandlerList.unregisterAll(Dash.this);
                         cancel();
                     }
                 } else {
-                    ticks = 0;
+                    groundTicks = 0;
                 }
             }
-        }.runTaskTimer(plugin, 0, 1);
+        }.runTaskTimer(plugin, 0L, 1L);
 
-        Bukkit.getServer().getPluginManager().registerEvents(this, plugin);
         return true;
     }
 }

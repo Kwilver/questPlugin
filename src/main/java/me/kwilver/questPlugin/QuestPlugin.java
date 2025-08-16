@@ -62,6 +62,9 @@ public final class QuestPlugin extends JavaPlugin implements Listener {
     private File playerDataFile;
     private FileConfiguration playerDataConfig;
 
+    private File trueDamageFile;
+    private static FileConfiguration trueDamageConfig;
+
     private File dailyFile;
     private static YamlConfiguration dailyConfig;
 
@@ -103,9 +106,9 @@ public final class QuestPlugin extends JavaPlugin implements Listener {
         allGlyphs.add(new GlyphTracker(Flashback.class,
                 "Flashback",
                 List.of("Harness the power of time itself to \"flashback\" to a previous location.",
-                        ChatColor.YELLOW + "Cooldown: 10m"),
+                        ChatColor.YELLOW + "Cooldown: 1m 30s"),
                 5003,
-                2 * 60));
+                90));
         allGlyphs.add(new GlyphTracker(Geo.class,
                 "Geo",
                 List.of("Summon a meteor from the heavens to rain terror upon the ground below.",
@@ -198,7 +201,7 @@ public final class QuestPlugin extends JavaPlugin implements Listener {
                 "Curse",
                 List.of("Stun and curse a player of your choice..."),
                 50019,
-                        40));
+                        90));
 
 
         enabledGlyphFile = new File(getDataFolder(), "enabledGlyphs.yml");
@@ -297,6 +300,14 @@ public final class QuestPlugin extends JavaPlugin implements Listener {
         }
 
         playerDataConfig = YamlConfiguration.loadConfiguration(playerDataFile);
+
+        trueDamageFile = new File(getDataFolder(), "trueDamage.yml");
+        if (!trueDamageFile.exists()) {
+            trueDamageFile.getParentFile().mkdirs();
+            saveResource("trueDamage.yml", false);
+        }
+
+        trueDamageConfig = YamlConfiguration.loadConfiguration(trueDamageFile);
 
         idFile = new File(getDataFolder(), "oracleId.yml");
         if (!idFile.exists()) {
@@ -826,5 +837,9 @@ public final class QuestPlugin extends JavaPlugin implements Listener {
         if(oracle != null && e.getEntity() == oracle.oracle) {
             e.setCancelled(true);
         }
+    }
+
+    public static double getTrueDamage(Object o) {
+        return trueDamageConfig.getDouble(o.getClass().getSimpleName());
     }
 }

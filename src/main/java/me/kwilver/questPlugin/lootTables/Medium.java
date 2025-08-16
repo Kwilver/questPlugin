@@ -64,7 +64,7 @@ public class Medium extends LootTable {
 
     @Override
     protected boolean rollGlyph() {
-        return random.nextInt(9) == 0;
+        return random.nextInt(10) <= 3;
     }
 
     @Override

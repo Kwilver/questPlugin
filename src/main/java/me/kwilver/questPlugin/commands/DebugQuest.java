@@ -19,7 +19,7 @@ public class DebugQuest implements CommandExecutor {
 
     @Override
     public boolean onCommand(@NotNull CommandSender commandSender, @NotNull Command command, @NotNull String s, @NotNull String @NotNull [] strings) {
-        main.newQuest(Survive.class, (Player) commandSender); //TODO this is terrible remove asap
+        main.newQuest(Miner.class, (Player) commandSender); //TODO this is terrible remove asap
         return true;
     }
 }

@@ -71,7 +71,7 @@ public class Hard extends LootTable {
 
     @Override
     protected boolean rollGlyph() {
-        return random.nextInt(4) < 3;
+        return random.nextInt(4) != 0;
     }
 
     @Override

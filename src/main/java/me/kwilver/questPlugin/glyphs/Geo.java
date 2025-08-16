@@ -2,195 +2,200 @@ package me.kwilver.questPlugin.glyphs;
 
 import me.kwilver.questPlugin.QuestPlugin;
 import net.md_5.bungee.api.ChatColor;
-import org.bukkit.Bukkit;
-import org.bukkit.Location;
-import org.bukkit.Material;
-import org.bukkit.Particle;
+import org.bukkit.*;
+import org.bukkit.attribute.Attribute;
 import org.bukkit.block.Block;
+import org.bukkit.entity.BlockDisplay;
 import org.bukkit.entity.Player;
+import org.bukkit.event.EventHandler;
+import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.Damageable;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.util.Vector;
+import org.joml.Matrix4f;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
-import java.util.Random;
+import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class Geo extends Glyph {
-    Location startLoc;
-    Location endLoc;
-    List<Material> blocks = new ArrayList<>();
+    private final Player user;
+    private final Plugin plugin;
 
     public Geo(Player player) {
         super(player);
+        this.user = player;
+        this.plugin = QuestPlugin.getInstance();
     }
 
-    public static List<Location> getLocationsBetween(Location start, Location end) {
-        List<Location> locations = new ArrayList<>();
-
-        Vector direction = end.toVector().subtract(start.toVector());
-        double length = direction.length();
-        direction.normalize();
-
-        for (double i = 0; i <= length; i += 0.5) {
-            Vector current = start.toVector().add(direction.clone().multiply(i));
-            Location loc = current.toLocation(start.getWorld());
-
-            loc.setX(loc.getBlockX() + 0.5);
-            loc.setY(loc.getBlockY() + 0.5);
-            loc.setZ(loc.getBlockZ() + 0.5);
-
-            if (!locations.contains(loc)) {
-                locations.add(loc);
-            }
-        }
-
-        return locations;
-    }
-
-    public void drawSphere(Location center, int radius) {
-        int index = 0;
-        for (int x = -radius; x <= radius; x++) {
-            for (int y = -radius; y <= radius; y++) {
-                for (int z = -radius; z <= radius; z++) {
-                    if (x * x + y * y + z * z <= radius * radius) {
-                        Location loc = center.clone().add(x, y, z);
-                        Block block = loc.getBlock();
-
-                        Random random = new Random();
-                        int i = random.nextInt(5);
-
-                        if(blocks.size() == index) {
-                            if(i == 0) blocks.add(Material.COBBLESTONE);
-                            if(i == 1) blocks.add(Material.GRANITE);
-                            if(i == 2) blocks.add(Material.STONE);
-                            if(i == 3) blocks.add(Material.DIORITE);
-                            if(i == 4) blocks.add(Material.NETHERRACK);
-                        }
-
-                        block.setType(blocks.get(index));
-
-                        index++;
-
-                        loc.getWorld().spawnParticle(Particle.CRIMSON_SPORE, loc, 10, null);
-                    }
-                }
-            }
-        }
-    }
-
-
-    public void eraseSphere(Location center, int radius) {
-        for (int x = -radius; x <= radius; x++) {
-            for (int y = -radius; y <= radius; y++) {
-                for (int z = -radius; z <= radius; z++) {
-                    if (x * x + y * y + z * z <= radius * radius) {
-                        Location loc = center.clone().add(x, y, z);
-                        Block block = loc.getBlock();
-
-                        block.setType(Material.AIR);
-                    }
-                }
-            }
-        }
-    }
-
-    void dealDamage(Location l) {
-        l.getWorld().createExplosion(l, 25);
-
-        for (Player p : Bukkit.getOnlinePlayers()) {
-            double distance = p.getLocation().distance(l);
-            if (distance < 15) {
-                double rawDamage = 30 - distance * 2;
-
-                p.damage(rawDamage);
-
-                for (ItemStack item : p.getInventory().getArmorContents()) {
-                    if (item == null) continue;
-                    if (item.getType().getMaxDurability() <= 0) continue;
-
-                    ItemMeta meta = item.getItemMeta();
-                    if (!(meta instanceof Damageable dmgMeta)) continue;
-
-                    int armorDamage = (int) (45 - distance * 3);
-
-                    int current = dmgMeta.getDamage();
-                    int max    = item.getType().getMaxDurability();
-                    int updated = current + armorDamage;
-                    updated = Math.max(0, Math.min(updated, max));
-
-                    dmgMeta.setDamage(updated);
-                    item.setItemMeta(dmgMeta);
-                }
-                Bukkit.getScheduler().runTask(plugin, p::updateInventory);
-            }
-        }
-    }
-
+    @Override
     protected boolean useGlyph() {
-        if(user.getLocation().distance(QuestPlugin.getOracle().oracle.getLocation()) < 100) {
-            user.sendMessage(ChatColor.RED + "You cannot use Geo within 100 blocks of the Oracle!");
+        // Scan line of sight (20 blocks)
+        List<Block> sight = user.getLineOfSight(null, 20);
+        if (sight.isEmpty()) {
+            user.sendMessage(ChatColor.RED + "No valid sight blocks.");
             return false;
         }
-        user.getLineOfSight(null, 20);
-        for(Block block : user.getLineOfSight(null, 20)) {
-            endLoc = block.getLocation();
-
-            if(block.getType() != Material.AIR) {
+        Block lastSeen = sight.get(sight.size() - 1);
+        Block targetBlock = null;
+        for (Block b : sight) {
+            if (b.getType() != Material.AIR) {
+                targetBlock = b;
                 break;
             }
         }
-
-        if(endLoc.getBlock().getType() == Material.AIR) {
-            Location checkLoc = endLoc.clone();
-
-            while (checkLoc.getY() > -60) {
-                checkLoc.subtract(0, 1, 0);
-                Block block = checkLoc.getBlock();
-                if (block.getType().isSolid()) {
-                    endLoc = block.getLocation();
+        // If only air was seen, drop straight down from the farthest block until solid
+        if (targetBlock == null) {
+            Location probe = lastSeen.getLocation().clone();
+            while (probe.getY() > -60) {
+                probe.subtract(0, 1, 0);
+                if (probe.getBlock().getType().isSolid()) {
+                    targetBlock = probe.getBlock();
                     break;
                 }
             }
         }
+        if (targetBlock == null) {
+            user.sendMessage(ChatColor.RED + "Could not find ground block.");
+            return false;
+        }
 
-        startLoc = user.getLocation().clone().add(0, 10, 0);
+        Location endLoc = targetBlock.getLocation().add(0.5, 0.5, 0.5);
+        // Higher start (25 blocks above eyes)
+        Location startLoc = user.getEyeLocation().clone().add(0, 25, 0);
 
-        new GeoStepRunnable(null, 1, getLocationsBetween(startLoc, endLoc), 10).runTaskLater(plugin, 0);
+        List<Location> path = getLocationsBetween(startLoc, endLoc);
+        if (path.isEmpty()) {
+            user.sendMessage(ChatColor.RED + "Could not calculate path.");
+            return false;
+        }
+
+        World world = user.getWorld();
+        AtomicInteger idx = new AtomicInteger(0);
+        AtomicInteger taskId = new AtomicInteger();
+        final BlockDisplay[] cube = new BlockDisplay[1];
+
+        // Repeating task
+        taskId.set(Bukkit.getScheduler().scheduleSyncRepeatingTask(plugin, () -> {
+            int i = idx.getAndIncrement();
+            if (i >= path.size()) {
+                if (cube[0] != null) cube[0].remove();
+                Bukkit.getScheduler().cancelTask(taskId.get());
+                return;
+            }
+            Location center = path.get(i).clone().add(0, 1, 0);
+            if (cube[0] == null) {
+                cube[0] = world.spawn(center, BlockDisplay.class, e -> {
+                    e.setBlock(Material.MAGMA_BLOCK.createBlockData());
+                    e.setPersistent(false);
+                });
+            } else cube[0].teleport(center);
+
+            // Slightly smaller cube: scale 6
+            float angle = i * 0.03f;
+            cube[0].setTransformationMatrix(new Matrix4f()
+                    .rotateXYZ(angle * 0.04f, angle * 0.02f, 0f)
+                    .scale(6.0f));
+
+            // Resize particle cloud to new cube size
+            world.spawnParticle(Particle.FLAME, center, 30, 1.5, 1.5, 1.5, 0.03);
+            world.spawnParticle(Particle.LAVA, center, 10, 0.9, 0.9, 0.9, 0);
+            world.spawnParticle(Particle.SMOKE, center, 15, 1.5, 1.5, 1.5, 0.01);
+
+            // Impact phase
+            if (i == path.size() - 1) {
+                triggerExplosions(center);
+                cube[0].remove();
+                Bukkit.getScheduler().cancelTask(taskId.get());
+            }
+        }, 0L, 1L));
         return true;
     }
 
+    private List<Location> getLocationsBetween(Location start, Location end) {
+        List<Location> locs = new ArrayList<>();
+        Vector dir = end.toVector().subtract(start.toVector());
+        double len = dir.length();
+        if (len < 0.1) return locs;
+        dir.normalize();
+        for (double d = 0; d <= len; d += 0.5) {
+            Vector cur = start.toVector().add(dir.clone().multiply(d));
+            Location loc = cur.toLocation(start.getWorld());
+            loc.setX(loc.getBlockX() + 0.5);
+            loc.setY(loc.getBlockY() + 0.5);
+            loc.setZ(loc.getBlockZ() + 0.5);
+            locs.add(loc);
+        }
+        return locs;
+    }
 
-    private class GeoStepRunnable extends BukkitRunnable {
-        private final int currentIndex;
-        private final List<Location> list;
-        private final int tickDelay;
-
-        public GeoStepRunnable(BukkitRunnable self, int currentIndex, List<Location> list, int tickDelay) {
-            this.currentIndex = currentIndex;
-            this.list = list;
-            this.tickDelay = tickDelay;
+    private void triggerExplosions(Location center) {
+        World w = center.getWorld();
+        // Core blast (power 7) – breaks blocks
+        w.createExplosion(center, 7, false, true);
+        // Ring blasts (power 5)
+        Vector[] offsets = {
+                new Vector(3, 0, 0), new Vector(-3, 0, 0),
+                new Vector(0, 0, 3), new Vector(0, 0, -3),
+                new Vector(0, 3, 0)
+        };
+        for (Vector off : offsets) {
+            w.createExplosion(center.clone().add(off), 5, false, true);
         }
 
-        @Override
-        public void run() {
-            if (currentIndex >= list.size()) return;
-
-            eraseSphere(list.get(currentIndex - 1), 5);
-            drawSphere(list.get(currentIndex), 5);
-
-            if (currentIndex == list.size() - 1) {
-                dealDamage(list.get(currentIndex));
-                eraseSphere(list.get(currentIndex), 5);
-                return;
+        safe.add(center);
+        new BukkitRunnable() {
+            public void run() {
+                safe.remove(center);
             }
+        }.runTaskLater(plugin, 5 * 20);
 
-            new GeoStepRunnable(null, currentIndex + 1, list, 1).runTaskLater(plugin, 1);
+        for (Player p : Bukkit.getOnlinePlayers()) {
+            double dist = p.getLocation().distance(center);
+
+            double maxHp = p.getAttribute(Attribute.MAX_HEALTH).getValue();
+            double base  = 0.75 * maxHp;
+            double dmg   = Math.max(0, base - (base/15) * dist);
+
+            if (dmg > 0) {
+                p.setHealth(Math.max(0, p.getHealth() - dmg));
+                degradeArmor(p, dist);
+            }
         }
     }
 
+    private void degradeArmor(Player p, double dist) {
+        for (ItemStack item : p.getInventory().getArmorContents()) {
+            if (item == null || item.getType().getMaxDurability() <= 0) continue;
+            ItemMeta meta = item.getItemMeta();
+            if (!(meta instanceof Damageable dmg)) continue;
+            int extra = (int) (35 - dist * 2.5);
+            dmg.setDamage(Math.min(item.getType().getMaxDurability(), dmg.getDamage() + Math.max(0, extra)));
+            item.setItemMeta(dmg);
+        }
+        Bukkit.getScheduler().runTask(plugin, p::updateInventory);
+    }
 
+    Set<Location> safe = new HashSet<>();
+
+    @EventHandler
+    public void onEntityDamage(EntityDamageEvent event) {
+        EntityDamageEvent.DamageCause cause = event.getCause();
+        if (cause != EntityDamageEvent.DamageCause.BLOCK_EXPLOSION && cause != EntityDamageEvent.DamageCause.ENTITY_EXPLOSION) return;
+
+        Location hitLoc = event.getEntity().getLocation();
+
+        for (Location centre : safe) {
+            if (!centre.getWorld().equals(hitLoc.getWorld())) continue;
+            if (centre.distanceSquared(hitLoc) <= 30) {
+                event.setCancelled(true);
+                return;
+            }
+        }
+    }
 }

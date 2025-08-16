@@ -47,7 +47,7 @@ public class Miner extends Quest implements Listener {
 
     @Override
     public String displayName() {
-        return ChatColor.GREEN + "Hunter";
+        return ChatColor.GREEN + "Miner";
     }
 
     @EventHandler

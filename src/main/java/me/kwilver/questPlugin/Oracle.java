@@ -14,6 +14,7 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerInteractAtEntityEvent;
+import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.scheduler.BukkitRunnable;
 import net.md_5.bungee.api.chat.TextComponent;
 import net.md_5.bungee.api.chat.ClickEvent;
@@ -92,6 +93,13 @@ public class Oracle implements Listener, CommandExecutor {
         }
     }
 
+    @EventHandler
+    public void onPlayerQuit(PlayerQuitEvent e) {
+        talkingToNpc.remove(e.getPlayer().getUniqueId());
+        //DEBUG REMOVE
+        main.lastCompletions.remove(e.getPlayer().getUniqueId());
+    }
+
     private void talkToPlayer(Player p) {
         if (main.activeQuests.containsKey(p)) {
             oracleText(p, "Complete your current quest, then come back...");
@@ -118,6 +126,7 @@ public class Oracle implements Listener, CommandExecutor {
                 }
             }.runTaskLater(main, 60);
             oracleText(p, "Rest for a while and come back later...");
+            talkingToNpc.remove(p.getUniqueId());
             return;
         }
 
@@ -127,6 +136,7 @@ public class Oracle implements Listener, CommandExecutor {
                 @Override
                 public void run() {
                     oracleText(p, "Rest up and come back tomorrow...");
+                    talkingToNpc.remove(p.getUniqueId());
                 }
             }.runTaskLater(main, 60);
 
